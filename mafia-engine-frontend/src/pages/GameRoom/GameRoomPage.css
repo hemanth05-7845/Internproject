@@ -1,0 +1,269 @@
+.game-room {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  background: var(--bg-0);
+}
+
+/* Header */
+.game-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 20px;
+  border-radius: 0;
+  border-left: none; border-right: none; border-top: none;
+  position: sticky; top: 0; z-index: 10;
+  background: rgba(6,6,9,0.92);
+  backdrop-filter: blur(12px);
+}
+.header-left  { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.header-right { display: flex; align-items: center; gap: 8px; }
+
+.room-code-sm {
+  font-family: 'Cinzel', serif;
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--text-2);
+  letter-spacing: 2px;
+}
+.day-tag, .night-tag {
+  font-size: 10px; font-weight: 700;
+  padding: 2px 8px; border-radius: 3px;
+  letter-spacing: .5px; text-transform: uppercase;
+}
+.day-tag   { background: var(--green-dim); border: 1px solid var(--green); color: var(--green); }
+.night-tag { background: var(--blue-dim);  border: 1px solid var(--blue);  color: var(--blue); }
+
+.host-badge {
+  padding: 3px 8px;
+  border-radius: 3px;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: .6px;
+  text-transform: uppercase;
+  background: var(--gold-dim);
+  border: 1px solid var(--gold);
+  color: var(--gold);
+}
+.my-role-chip {
+  padding: 3px 10px;
+  border-radius: 3px;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: .8px;
+  text-transform: uppercase;
+  border-width: 1px; border-style: solid;
+  background: rgba(255,255,255,0.04);
+}
+
+/* Body layout */
+.game-body {
+  flex: 1;
+  display: grid;
+  grid-template-columns: 200px 1fr 300px;
+  gap: 0;
+  overflow: hidden;
+}
+
+/* Side panels */
+.players-panel, .events-panel {
+  border-radius: 0;
+  border-top: none; border-bottom: none;
+  padding: 18px 14px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.players-panel { border-left: none; }
+.events-panel  { border-right: none; }
+
+.panel-title {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: .8px;
+  color: var(--text-3);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.panel-count {
+  font-weight: 400;
+  color: var(--text-3);
+  font-size: 11px;
+  letter-spacing: 0;
+  text-transform: none;
+}
+
+/* Player list */
+.player-list { display: flex; flex-direction: column; gap: 4px; }
+.player-row {
+  display: flex; align-items: center; gap: 7px;
+  padding: 7px 10px;
+  border-radius: var(--radius-sm);
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  transition: opacity .25s;
+}
+.player-row.dead { opacity: .35; }
+.player-row.me   { border-color: rgba(91,155,213,.3); }
+.player-avatar {
+  width: 24px; height: 24px; border-radius: 50%;
+  background: var(--red-dark);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 11px; font-weight: 700; color: #fff; flex-shrink: 0;
+}
+.player-name-col { font-size: 13px; font-weight: 500; flex: 1; }
+.host-dot {
+  width: 6px; height: 6px; border-radius: 50%;
+  background: var(--gold); flex-shrink: 0;
+}
+
+/* Action panel */
+.action-panel {
+  padding: 32px 24px;
+  overflow-y: auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.phase-card {
+  width: 100%;
+  max-width: 480px;
+  padding: 32px 28px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 18px;
+  text-align: center;
+}
+
+/* Phase colour accents via left border */
+.night-card   { border-left: 3px solid var(--blue); }
+.police-card  { border-left: 3px solid var(--purple); }
+.doctor-card  { border-left: 3px solid var(--green); }
+.sunrise-card { border-left: 3px solid var(--gold); }
+.day-card     { border-left: 3px solid var(--green); }
+.voting-card  { border-left: 3px solid var(--red); }
+
+.phase-kicker {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  color: var(--text-3);
+}
+.phase-card h2 {
+  font-family: 'Cinzel', serif;
+  font-size: 22px;
+  font-weight: 700;
+  color: var(--text-1);
+}
+.text-red  { color: var(--red) !important; }
+.text-gold { color: var(--gold) !important; }
+
+.phase-desc { color: var(--text-2); font-size: 14px; max-width: 320px; line-height: 1.7; }
+.muted-msg  { color: var(--text-3); font-style: italic; }
+.done-msg   { color: var(--green); font-weight: 600; font-size: 14px; }
+
+/* Target buttons */
+.target-list { display: flex; flex-direction: column; gap: 6px; width: 100%; max-width: 260px; }
+.target-btn {
+  padding: 10px 18px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+  background: var(--bg-2);
+  color: var(--text-1);
+  font-size: 13px; font-weight: 600;
+  width: 100%; text-align: left;
+  transition: all .18s;
+}
+.kill-btn:not(:disabled):hover   { border-color: var(--red);    background: var(--red-dim);  color: var(--red); }
+.police-btn:not(:disabled):hover { border-color: var(--purple); background: rgba(139,110,201,0.12); color: var(--purple); }
+.doctor-btn:not(:disabled):hover { border-color: var(--green);  background: var(--green-dim);  color: var(--green); }
+.vote-btn:not(:disabled):hover   { border-color: var(--red);    background: var(--red-dim);  color: var(--red); }
+.target-btn:disabled { opacity: .35; cursor: not-allowed; }
+
+/* Host controls */
+.host-btn { margin-top: 4px; }
+
+/* Waiting message */
+.waiting-host-msg {
+  margin-top: 6px;
+  padding: 10px 16px;
+  border-radius: var(--radius-sm);
+  background: var(--bg-2);
+  border: 1px solid var(--border);
+  color: var(--text-2);
+  font-size: 13px;
+}
+
+/* Sunrise reveal */
+.reveal-cards { display: flex; flex-direction: column; gap: 10px; width: 100%; }
+.reveal-card {
+  padding: 14px 16px;
+  border-radius: var(--radius-sm);
+  text-align: left;
+}
+.reveal-label { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .8px; color: var(--text-3); margin-bottom: 4px; }
+.reveal-value { font-size: 14px; color: var(--text-1); line-height: 1.5; }
+.kill-reveal    { background: var(--red-dim);   border: 1px solid rgba(192,57,43,.25); }
+.correct-reveal { background: var(--green-dim); border: 1px solid rgba(82,168,122,.3); }
+.wrong-reveal   { background: var(--gold-dim);  border: 1px solid rgba(212,168,83,.25); }
+
+/* Inner scroll for events in phase card */
+.inner-scroll { max-height: 140px; overflow-y: auto; width: 100%; }
+
+/* Events panel */
+.events-scroll { display: flex; flex-direction: column; gap: 6px; overflow-y: auto; }
+.event-row { display: flex; align-items: flex-start; gap: 7px; font-size: 12px; color: var(--text-2); }
+.event-dot { width: 4px; height: 4px; border-radius: 50%; background: var(--red); flex-shrink: 0; margin-top: 6px; }
+.no-events { color: var(--text-3); font-size: 12px; font-style: italic; }
+
+.eliminated-section { border-top: 1px solid var(--border); padding-top: 10px; display: flex; flex-direction: column; gap: 4px; }
+.eliminated-name { font-size: 12px; color: var(--text-3); text-decoration: line-through; }
+
+/* Chat */
+.chat-messages {
+  flex: 1;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  max-height: 180px;
+}
+.chat-bubble { display: flex; flex-direction: column; gap: 2px; }
+.chat-bubble.mine { align-items: flex-end; }
+.chat-bubble.theirs { align-items: flex-start; }
+.chat-sender { font-size: 10px; font-weight: 700; color: var(--text-3); letter-spacing: .2px; }
+.chat-text {
+  padding: 6px 10px;
+  border-radius: 8px;
+  font-size: 13px;
+  max-width: 90%;
+  line-height: 1.4;
+  word-break: break-word;
+}
+.mine .chat-text {
+  background: var(--red-dark);
+  color: #fff;
+  border-bottom-right-radius: 2px;
+}
+.theirs .chat-text {
+  background: var(--bg-2);
+  border: 1px solid var(--border);
+  color: var(--text-1);
+  border-bottom-left-radius: 2px;
+}
+.chat-input-row { display: flex; gap: 6px; margin-top: 6px; }
+.chat-input { flex: 1; padding: 8px 10px; font-size: 13px; }
+.send-btn { padding: 8px 12px; font-size: 12px; flex-shrink: 0; }
+
+/* Responsive */
+@media(max-width: 768px) {
+  .game-body { grid-template-columns: 1fr; }
+  .players-panel, .events-panel { display: none; }
+}

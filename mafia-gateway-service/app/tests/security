@@ -1,0 +1,23 @@
+import pytest
+from fastapi import HTTPException
+from app.core.security import jwt_handler
+
+def test_create_and_decode_token():
+    secret = "test-secret"
+    algo = "HS256"
+    token = jwt_handler.create_access_token("test-user", secret, algo, 60)
+    
+    decoded = jwt_handler.decode_access_token(token, secret, algo)
+    assert decoded == "test-user"
+
+def test_decode_invalid_token():
+    with pytest.raises(HTTPException) as excinfo:
+        jwt_handler.decode_access_token("invalid.token.string", "secret", "HS256")
+    
+    assert excinfo.value.status_code == 401
+    assert "Invalid or expired token" in excinfo.value.detail
+
+def test_decode_expired_token():
+    token = jwt_handler.create_access_token("test-user", "secret", "HS256", -1) # Expired 1 min ago
+    with pytest.raises(HTTPException):
+        jwt_handler.decode_access_token(token, "secret", "HS256")

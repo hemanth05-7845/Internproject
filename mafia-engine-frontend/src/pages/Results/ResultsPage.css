@@ -1,0 +1,81 @@
+.results-page {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  background: var(--bg-0);
+}
+
+.results-card {
+  width: 100%;
+  max-width: 480px;
+  padding: 36px 32px;
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+/* Winner banner */
+.winner-banner {
+  text-align: center;
+  padding: 28px 20px;
+  border-radius: var(--radius);
+}
+.winner-kicker {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  color: var(--text-3);
+  margin-bottom: 8px;
+}
+.winner-banner h1 {
+  font-family: 'Cinzel', serif;
+  font-size: 28px;
+  font-weight: 900;
+  margin: 6px 0;
+}
+.winner-banner p { color: var(--text-2); font-size: 14px; line-height: 1.6; }
+
+.mafia-win {
+  background: var(--red-dim);
+  border: 1px solid rgba(192,57,43,.3);
+}
+.mafia-win h1 { color: var(--red); }
+
+.village-win {
+  background: var(--gold-dim);
+  border: 1px solid rgba(212,168,83,.3);
+}
+.village-win h1 { color: var(--gold); }
+
+/* Role reveal */
+.reveal-heading {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: .8px;
+  color: var(--text-3);
+  margin-bottom: 10px;
+}
+.reveal-grid { display: flex; flex-direction: column; gap: 6px; }
+.reveal-player {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  border-radius: var(--radius-sm);
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  transition: opacity .2s;
+}
+.reveal-player.eliminated { opacity: .4; }
+.reveal-avatar {
+  width: 28px; height: 28px;
+  border-radius: 50%;
+  background: var(--red-dark);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 12px; font-weight: 700; color: #fff; flex-shrink: 0;
+}
+.reveal-name { flex: 1; font-size: 14px; font-weight: 500; }

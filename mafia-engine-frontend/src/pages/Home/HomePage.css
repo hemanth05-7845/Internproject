@@ -1,0 +1,94 @@
+.home-page {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  background: var(--bg-0);
+}
+
+/* Card */
+.home-card {
+  width: 100%;
+  max-width: 400px;
+  padding: 44px 36px;
+  display: flex;
+  flex-direction: column;
+  gap: 32px;
+}
+
+/* Logo */
+.home-logo { text-align: center; }
+.logo-title {
+  font-family: 'Cinzel', serif;
+  font-size: 40px;
+  font-weight: 900;
+  letter-spacing: 12px;
+  color: var(--text-1);
+}
+.logo-sub {
+  color: var(--text-3);
+  font-size: 12px;
+  margin-top: 8px;
+  letter-spacing: .5px;
+}
+
+/* Divider accent */
+.logo-accent {
+  display: block;
+  width: 32px;
+  height: 2px;
+  background: var(--red);
+  margin: 10px auto 0;
+}
+
+/* Form */
+.home-form { display: flex; flex-direction: column; gap: 14px; }
+.form-field { display: flex; flex-direction: column; gap: 5px; }
+.field-label {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-3);
+  letter-spacing: .5px;
+  text-transform: uppercase;
+}
+
+.code-input {
+  text-align: center;
+  font-size: 22px;
+  font-weight: 700;
+  letter-spacing: 8px;
+  text-transform: uppercase;
+}
+
+.home-actions { display: flex; flex-direction: column; gap: 8px; }
+
+.info-box {
+  padding: 10px 14px;
+  border-radius: var(--radius-sm);
+  background: var(--bg-1);
+  border: 1px solid var(--border);
+  color: var(--text-2);
+  font-size: 12px;
+  text-align: center;
+}
+
+/* Role tags */
+.home-roles {
+  display: flex;
+  gap: 6px;
+  justify-content: center;
+  padding-top: 4px;
+  border-top: 1px solid var(--border);
+}
+.role-pill {
+  padding: 4px 12px;
+  border-radius: 3px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: .4px;
+  text-transform: uppercase;
+}
+.mafia-pill    { background: var(--red-dim);    border: 1px solid var(--red);    color: var(--red); }
+.police-pill   { background: var(--gold-dim);   border: 1px solid var(--gold);   color: var(--gold); }
+.villager-pill { background: var(--blue-dim);   border: 1px solid var(--blue);   color: var(--blue); }

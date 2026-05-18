@@ -1,0 +1,179 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700\u0026family=Cinzel:wght@600;700;900\u0026display=swap');
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --bg-0:       #060609;
+  --bg-1:       #0c0c12;
+  --bg-2:       #111118;
+  --bg-card:    rgba(255,255,255,0.03);
+  --bg-hover:   rgba(255,255,255,0.06);
+  --border:     rgba(255,255,255,0.07);
+  --border-lit: rgba(255,255,255,0.12);
+
+  --red:        #c0392b;
+  --red-dim:    rgba(192,57,43,0.15);
+  --red-dark:   #7b241c;
+  --gold:       #d4a853;
+  --gold-dim:   rgba(212,168,83,0.15);
+  --blue:       #5b9bd5;
+  --blue-dim:   rgba(91,155,213,0.15);
+  --green:      #52a87a;
+  --green-dim:  rgba(82,168,122,0.15);
+  --purple:     #8b6ec9;
+
+  --text-1: #e8eaf0;
+  --text-2: #8a90a0;
+  --text-3: #50556a;
+
+  --radius-sm: 6px;
+  --radius:    10px;
+  --radius-lg: 14px;
+  --shadow:    0 4px 24px rgba(0,0,0,0.5);
+  --shadow-lg: 0 12px 48px rgba(0,0,0,0.7);
+}
+
+html, body, #root {
+  height: 100%;
+  background: var(--bg-0);
+  color: var(--text-1);
+  font-family: 'Inter', sans-serif;
+  font-size: 14px;
+  line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* ---- Scrollbar ---- */
+::-webkit-scrollbar { width: 4px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--border-lit); border-radius: 2px; }
+
+/* ---- Utility ---- */
+.glass {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+
+.glass-lg {
+  background: rgba(10,10,16,0.9);
+  border: 1px solid var(--border-lit);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-lg);
+}
+
+/* ---- Buttons ---- */
+button { font-family: inherit; cursor: pointer; transition: all .18s; }
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 11px 22px;
+  border: none;
+  border-radius: var(--radius-sm);
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: .3px;
+}
+.btn:disabled { opacity: .35; cursor: not-allowed; }
+
+.btn-primary {
+  background: var(--red);
+  color: #fff;
+}
+.btn-primary:not(:disabled):hover {
+  background: #a93226;
+  transform: translateY(-1px);
+}
+
+.btn-secondary {
+  background: var(--bg-hover);
+  color: var(--text-1);
+  border: 1px solid var(--border-lit);
+}
+.btn-secondary:not(:disabled):hover { background: rgba(255,255,255,0.09); }
+
+.btn-gold {
+  background: var(--gold);
+  color: #0a0a12;
+  font-weight: 700;
+}
+.btn-gold:not(:disabled):hover {
+  background: #c49a40;
+  transform: translateY(-1px);
+}
+
+.btn-lg { padding: 13px 28px; font-size: 14px; border-radius: var(--radius); }
+.btn-full { width: 100%; }
+
+/* ---- Inputs ---- */
+.input {
+  width: 100%;
+  padding: 11px 14px;
+  background: var(--bg-1);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  color: var(--text-1);
+  font-family: inherit;
+  font-size: 14px;
+  outline: none;
+  transition: border-color .18s;
+}
+.input::placeholder { color: var(--text-3); }
+.input:focus { border-color: var(--red); }
+
+/* ---- Phase badges ---- */
+.phase-badge {
+  display: inline-block;
+  padding: 3px 10px;
+  border-radius: 4px;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 1.2px;
+  text-transform: uppercase;
+}
+.phase-NIGHT        { background: var(--bg-2); border: 1px solid var(--border); color: var(--blue); }
+.phase-POLICE_GUESS { background: var(--bg-2); border: 1px solid var(--border); color: var(--purple); }
+.phase-SUNRISE      { background: var(--bg-2); border: 1px solid var(--border); color: var(--gold); }
+.phase-DAY_DISCUSSION { background: var(--bg-2); border: 1px solid var(--border); color: var(--green); }
+.phase-VOTING       { background: var(--bg-2); border: 1px solid var(--border); color: var(--red); }
+.phase-LOBBY        { background: var(--bg-2); border: 1px solid var(--border); color: var(--text-2); }
+.phase-GAME_OVER    { background: var(--bg-2); border: 1px solid var(--border); color: var(--gold); }
+
+/* ---- Role chips ---- */
+.role-chip {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 3px;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: .6px;
+  text-transform: uppercase;
+}
+.role-MAFIA    { background: var(--red-dim);    border: 1px solid var(--red);    color: var(--red); }
+.role-POLICE   { background: var(--gold-dim);   border: 1px solid var(--gold);   color: var(--gold); }
+.role-VILLAGER { background: var(--blue-dim);   border: 1px solid var(--blue);   color: var(--blue); }
+
+/* ---- Error ---- */
+.error-msg {
+  color: var(--red);
+  font-size: 12px;
+  padding: 8px 12px;
+  background: var(--red-dim);
+  border-radius: var(--radius-sm);
+  border: 1px solid rgba(192,57,43,.25);
+}
+
+/* ---- Animations ---- */
+@keyframes fadeUp {
+  from { opacity:0; transform:translateY(12px); }
+  to   { opacity:1; transform:translateY(0); }
+}
+@keyframes pulse {
+  0%,100% { opacity:1; }
+  50%      { opacity:.55; }
+}
+
+.fade-up { animation: fadeUp .35s ease both; }
