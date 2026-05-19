@@ -8,69 +8,79 @@ import (
 
 	"github.com/example/mafia-event-service/internal/service"
 	"github.com/gin-gonic/gin"
+	"github.com/stretchr/testify/assert"
 )
 
 func setupTimerRouter() *gin.Engine {
 	gin.SetMode(gin.TestMode)
 	tm := service.NewTimerManager()
-	r := gin.Default()
-	RegisterTimerRoutes(r, tm)
+	es := service.GetEventStore()
+	r := gin.New()
+	controller := NewTimerController(tm, es)
+	controller.RegisterTimerRoutes(r)
 	return r
 }
 
-func TestHealthCheck(t *testing.T) {
-	r := setupTimerRouter()
-
-	req, _ := http.NewRequest("GET", "/api/health", nil)
-	w := httptest.NewRecorder()
-	r.ServeHTTP(w, req)
-
-	if w.Code != http.StatusOK {
-		t.Errorf("Expected 200 OK, got %d", w.Code)
-	}
-}
-
-func TestTimerSnapshot(t *testing.T) {
-	r := setupTimerRouter()
-
-	req, _ := http.NewRequest("GET", "/api/timer/room1", nil)
-	w := httptest.NewRecorder()
-	r.ServeHTTP(w, req)
-
-	if w.Code != http.StatusOK {
-		t.Errorf("Expected 200 OK, got %d", w.Code)
-	}
-}
-
-func TestGetEvents(t *testing.T) {
-	r := setupTimerRouter()
-
-	req, _ := http.NewRequest("GET", "/api/events/room1", nil)
-	w := httptest.NewRecorder()
-	r.ServeHTTP(w, req)
-
-	if w.Code != http.StatusOK {
-		t.Errorf("Expected 200 OK, got %d", w.Code)
-	}
-}
-
-func TestPushEvent(t *testing.T) {
-	r := setupTimerRouter()
-
-	body := []byte(`{"type": "VOTE", "description": "Bob voted Alice"}`)
-	req, _ := http.NewRequest("POST", "/api/events/room1", bytes.NewBuffer(body))
-	w := httptest.NewRecorder()
-	r.ServeHTTP(w, req)
-
-	if w.Code != http.StatusOK {
-		t.Errorf("Expected 200 OK, got %d", w.Code)
+func TestTimerControllerRoutes(t *testing.T) {
+	tests := []struct {
+		name           string
+		method         string
+		url            string
+		body           []byte
+		contentType    string
+		expectedStatus int
+	}{
+		{
+			name:           "health check",
+			method:         http.MethodGet,
+			url:            "/api/health",
+			expectedStatus: http.StatusOK,
+		},
+		{
+			name:           "timer snapshot",
+			method:         http.MethodGet,
+			url:            "/api/timer/room1",
+			expectedStatus: http.StatusOK,
+		},
+		{
+			name:           "get events",
+			method:         http.MethodGet,
+			url:            "/api/events/room1",
+			expectedStatus: http.StatusOK,
+		},
+		{
+			name:           "push event success",
+			method:         http.MethodPost,
+			url:            "/api/events/room1",
+			body:           []byte(`{"type":"VOTE","description":"Bob voted Alice"}`),
+			contentType:    "application/json",
+			expectedStatus: http.StatusOK,
+		},
+		{
+			name:           "push event bad json",
+			method:         http.MethodPost,
+			url:            "/api/events/room1",
+			body:           []byte(`{bad}`),
+			contentType:    "application/json",
+			expectedStatus: http.StatusBadRequest,
+		},
 	}
 
-	// Bad Request
-	reqBad, _ := http.NewRequest("POST", "/api/events/room1", bytes.NewBuffer([]byte(`{bad}`)))
-	wBad := httptest.NewRecorder()
-	r.ServeHTTP(wBad, reqBad)
-	if wBad.Code != http.StatusBadRequest {
-		t.Errorf("Expected 400 Bad Request, got %d", wBad.Code)
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			r := setupTimerRouter()
+			var req *http.Request
+			if tt.body != nil {
+				req, _ = http.NewRequest(tt.method, tt.url, bytes.NewBuffer(tt.body))
+			} else {
+				req, _ = http.NewRequest(tt.method, tt.url, nil)
+			}
+			if tt.contentType != "" {
+				req.Header.Set("Content-Type", tt.contentType)
+			}
+			w := httptest.NewRecorder()
+			r.ServeHTTP(w, req)
+			assert.Equal(t, tt.expectedStatus, w.Code)
+		})
 	}
 }

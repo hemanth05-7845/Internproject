@@ -1,6 +1,7 @@
 package controller
 
 import (
+	"log"
 	"net/http"
 	"time"
 
@@ -28,19 +29,17 @@ func (ptc *PhaseTransitionController) RegisterPhaseRoutes(r *gin.Engine) {
 
 func (ptc *PhaseTransitionController) StartPhaseTimer(c *gin.Context) {
 	roomID := c.Param("roomId")
-
 	var req struct {
-		Phase       string `json:"phase"`
-		DurationSec int    `json:"durationSeconds"`
+		Phase       string `json:"phase" binding:"required"`
+		DurationSec int    `json:"durationSeconds" binding:"required,min=1"`
 	}
-
-	if err := c.BindJSON(&req); err != nil {
+	if err := c.ShouldBindJSON(&req); err != nil {
+		log.Printf("StartPhaseTimer bad request room=%s: %v", roomID, err)
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
-
 	ptc.timerManager.StartTimer(roomID, req.Phase, req.DurationSec)
-
+	log.Printf("StartPhaseTimer timer started room=%s phase=%s duration=%ds", roomID, req.Phase, req.DurationSec)
 	c.JSON(http.StatusOK, gin.H{
 		"roomId":   roomID,
 		"phase":    req.Phase,
@@ -51,48 +50,43 @@ func (ptc *PhaseTransitionController) StartPhaseTimer(c *gin.Context) {
 
 func (ptc *PhaseTransitionController) TransitionPhase(c *gin.Context) {
 	roomID := c.Param("roomId")
-
 	var req struct {
-		NextPhase string `json:"nextPhase"`
+		NextPhase string `json:"nextPhase" binding:"required"`
 	}
-
-	if err := c.BindJSON(&req); err != nil {
+	if err := c.ShouldBindJSON(&req); err != nil {
+		log.Printf("TransitionPhase bad request room=%s: %v", roomID, err)
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
-
-	// Stop current timer
 	ptc.timerManager.StopTimer(roomID)
-
-	// Return phase transition event
+	log.Printf("TransitionPhase transition room=%s nextPhase=%s", roomID, req.NextPhase)
 	c.JSON(http.StatusOK, models.PhaseTransitionEvent{
 		RoomID:    roomID,
 		NextPhase: req.NextPhase,
-		Timestamp: time.Now().UTC().String(),
+		Timestamp: time.Now().UTC().Format(time.RFC3339),
 	})
 }
 
 func (ptc *PhaseTransitionController) GetPhaseStatus(c *gin.Context) {
 	roomID := c.Param("roomId")
-
 	timer := ptc.timerManager.GetTimer(roomID)
 	if timer == nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "No active timer for room"})
+		log.Printf("GetPhaseStatus no active timer room=%s", roomID)
+		c.JSON(http.StatusNotFound, gin.H{"error": "no active timer for room"})
 		return
 	}
-
 	c.JSON(http.StatusOK, models.TimerSnapshot{
 		RoomID:        roomID,
 		Phase:         timer.CurrentPhase,
 		RemainingTime: timer.RemainingTime,
-		UpdatedAt:     time.Now().UTC().String(),
+		UpdatedAt:     time.Now().UTC().Format(time.RFC3339),
 	})
 }
 
 func (ptc *PhaseTransitionController) CancelPhaseTimer(c *gin.Context) {
 	roomID := c.Param("roomId")
 	ptc.timerManager.StopTimer(roomID)
-
+	log.Printf("CancelPhaseTimer timer cancelled room=%s", roomID)
 	c.JSON(http.StatusOK, gin.H{
 		"roomId":  roomID,
 		"message": "Phase timer cancelled",
