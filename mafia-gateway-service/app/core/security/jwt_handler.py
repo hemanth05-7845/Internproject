@@ -5,7 +5,9 @@ import jwt
 from fastapi import HTTPException, status
 
 
-def create_access_token(subject: str, secret: str, algorithm: str, expires_minutes: int) -> str:
+def create_access_token(
+    subject: str, secret: str, algorithm: str, expires_minutes: int
+) -> str:
     now = datetime.now(timezone.utc)
     payload: dict[str, Any] = {
         "sub": subject,

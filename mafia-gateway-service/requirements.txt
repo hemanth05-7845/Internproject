@@ -3,3 +3,6 @@ uvicorn[standard]==0.35.0
 httpx==0.28.1
 pydantic==2.11.7
 PyJWT==2.9.0
+pytest==8.3.2
+pytest-asyncio==0.23.8
+pytest-cov==5.0.0

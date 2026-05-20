@@ -2,7 +2,6 @@ from pydantic import BaseModel, Field
 
 
 class JoinRequest(BaseModel):
-    """No password needed — players just enter their name."""
     username: str = Field(min_length=2, max_length=40)
 
 

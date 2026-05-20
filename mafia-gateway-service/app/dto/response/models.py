@@ -14,7 +14,7 @@ class ApiResponse(BaseModel):
 
 
 class RoomResponse(BaseModel):
-    """Matches shared-contracts/room-response/schema.json"""
+
     room_id: str
     room_code: str
     room_name: str
@@ -27,7 +27,7 @@ class RoomResponse(BaseModel):
 class PlayerInfo(BaseModel):
     name: str
     alive: bool
-    role: Optional[str] = None  # only own role visible
+    role: Optional[str] = None
 
 
 class ChatMessage(BaseModel):
@@ -43,10 +43,7 @@ class GameEvent(BaseModel):
 
 
 class GameSnapshot(BaseModel):
-    """
-    Matches shared-contracts/game-state/schema.json.
-    myRole is injected by the gateway before returning to the caller.
-    """
+
     phase: str
     day_number: int = 0
     night_number: int = 0
@@ -65,7 +62,7 @@ class GameSnapshot(BaseModel):
     room_code: str = ""
     host_username: str = ""
     phase_ends_at: str = ""
-    my_role: Optional[str] = None  # personalised by gateway
+    my_role: Optional[str] = None
 
 
 def default_snapshot() -> GameSnapshot:

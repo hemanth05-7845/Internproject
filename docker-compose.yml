@@ -34,7 +34,7 @@ services:
         condition: service_healthy
 
   mafia-event-service:
-    image: golang:1.23
+    image: golang:1.25
     container_name: mafia-event-service
     working_dir: /workspace
     command: sh -c "go mod tidy && go run ./main.go"
