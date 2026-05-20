@@ -7,6 +7,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
+
 func TestTimerManager(t *testing.T) {
 	tests := []struct {
 		name    string

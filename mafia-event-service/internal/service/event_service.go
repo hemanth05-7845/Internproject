@@ -1,9 +1,10 @@
 package service
 
 import (
-	"time"
 	"github.com/example/mafia-event-service/internal/models"
+	"time"
 )
+
 func BuildEventFeed(roomID string, es *EventStore) []models.EventFeedItem {
 	return es.GetEvents(roomID)
 }

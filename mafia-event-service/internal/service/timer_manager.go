@@ -1,8 +1,10 @@
 package service
+
 import (
 	"sync"
 	"time"
 )
+
 type TimerManager struct {
 	timers map[string]*RoomTimer
 	mu     sync.RWMutex
@@ -43,7 +45,7 @@ func (tm *TimerManager) StartTimer(roomID string, phase string, durationSec int)
 			timer.RemainingTime--
 			if timer.RemainingTime <= 0 {
 				timer.Stop()
-				delete(tm.timers, roomID) 
+				delete(tm.timers, roomID)
 				tm.mu.Unlock()
 				break
 			}

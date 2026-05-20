@@ -6,15 +6,18 @@ import (
 
 	"github.com/example/mafia-event-service/internal/models"
 )
+
 type EventStore struct {
 	mu     sync.RWMutex
 	events map[string][]models.EventFeedItem
 }
+
 var globalEventStore = &EventStore{
 	events: make(map[string][]models.EventFeedItem),
 }
-func GetEventStore() *EventStore { 
-	return globalEventStore 
+
+func GetEventStore() *EventStore {
+	return globalEventStore
 }
 func NewEventStore() *EventStore {
 	return &EventStore{events: make(map[string][]models.EventFeedItem)}

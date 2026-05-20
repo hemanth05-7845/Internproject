@@ -1,12 +1,12 @@
 package server
 
 import (
-	"log"
-	"os"
 	"github.com/example/mafia-event-service/internal/controller"
 	"github.com/example/mafia-event-service/internal/service"
 	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
+	"log"
+	"os"
 )
 
 func Run() {
@@ -16,8 +16,7 @@ func Run() {
 		AllowMethods: []string{"GET", "POST", "OPTIONS"},
 		AllowHeaders: []string{"Content-Type", "Authorization"},
 	}))
-
-	es :=service.GetEventStore()
+	es := service.GetEventStore()
 	tc := controller.NewTimerController(service.NewTimerManager(), es)
 	tc.RegisterTimerRoutes(r)
 	phaseController := controller.NewPhaseTransitionController(service.NewTimerManager())

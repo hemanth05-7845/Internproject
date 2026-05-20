@@ -3,26 +3,26 @@ package controller
 import (
 	"bytes"
 	"encoding/json"
-	"net/http"
-	"net/http/httptest"
-	"testing"
 	"github.com/example/mafia-event-service/internal/service"
 	"github.com/gin-gonic/gin"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"net/http"
+	"net/http/httptest"
+	"testing"
 )
 
 func setupPhaseRouter() (*gin.Engine, *service.TimerManager) {
 	gin.SetMode(gin.TestMode)
 	tm := service.NewTimerManager()
 	ptc := NewPhaseTransitionController(tm)
-	r := gin.New() 
+	r := gin.New()
 	ptc.RegisterPhaseRoutes(r)
 	return r, tm
 }
 func postJSON(r *gin.Engine, url string, body []byte) *httptest.ResponseRecorder {
 	req, _ := http.NewRequest("POST", url, bytes.NewBuffer(body))
-	req.Header.Set("Content-Type", "application/json") 
+	req.Header.Set("Content-Type", "application/json")
 	w := httptest.NewRecorder()
 	r.ServeHTTP(w, req)
 	return w
@@ -35,19 +35,19 @@ func getRequest(r *gin.Engine, url string) *httptest.ResponseRecorder {
 }
 func TestStartPhaseTimer(t *testing.T) {
 	tests := []struct {
-		name           string
-		body           []byte
-		expectedStatus int
-		expectedPhase  string
-		expectedTimer  bool
+		name             string
+		body             []byte
+		expectedStatus   int
+		expectedPhase    string
+		expectedTimer    bool
 		expectedDuration int
 	}{
 		{
-			name:           "success",
-			body:           []byte(`{"phase":"VOTING","durationSeconds":30}`),
-			expectedStatus: http.StatusOK,
-			expectedPhase:  "VOTING",
-			expectedTimer:  true,
+			name:             "success",
+			body:             []byte(`{"phase":"VOTING","durationSeconds":30}`),
+			expectedStatus:   http.StatusOK,
+			expectedPhase:    "VOTING",
+			expectedTimer:    true,
 			expectedDuration: 30,
 		},
 		{
@@ -81,7 +81,7 @@ func TestStartPhaseTimer(t *testing.T) {
 				require.NoError(t, json.Unmarshal(w.Body.Bytes(), &res))
 				assert.Equal(t, "room1", res["roomId"])
 				assert.Equal(t, tt.expectedPhase, res["phase"])
-				assert.Equal(t, float64(tt.expectedDuration), res["duration"]) 
+				assert.Equal(t, float64(tt.expectedDuration), res["duration"])
 				timer := tm.GetTimer("room1")
 				if tt.expectedTimer {
 					require.NotNil(t, timer)

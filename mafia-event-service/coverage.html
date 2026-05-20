@@ -1,0 +1,458 @@
+
+<!DOCTYPE html>
+<html>
+	<head>
+		<meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+		<title>server: Go Coverage Report</title>
+		<style>
+			body {
+				background: black;
+				color: rgb(80, 80, 80);
+			}
+			body, pre, #legend span {
+				font-family: Menlo, monospace;
+				font-weight: bold;
+			}
+			#topbar {
+				background: black;
+				position: fixed;
+				top: 0; left: 0; right: 0;
+				height: 42px;
+				border-bottom: 1px solid rgb(80, 80, 80);
+			}
+			#content {
+				margin-top: 50px;
+			}
+			#nav, #legend {
+				float: left;
+				margin-left: 10px;
+			}
+			#legend {
+				margin-top: 12px;
+			}
+			#nav {
+				margin-top: 10px;
+			}
+			#legend span {
+				margin: 0 5px;
+			}
+			.cov0 { color: rgb(192, 0, 0) }
+.cov1 { color: rgb(128, 128, 128) }
+.cov2 { color: rgb(116, 140, 131) }
+.cov3 { color: rgb(104, 152, 134) }
+.cov4 { color: rgb(92, 164, 137) }
+.cov5 { color: rgb(80, 176, 140) }
+.cov6 { color: rgb(68, 188, 143) }
+.cov7 { color: rgb(56, 200, 146) }
+.cov8 { color: rgb(44, 212, 149) }
+.cov9 { color: rgb(32, 224, 152) }
+.cov10 { color: rgb(20, 236, 155) }
+
+		</style>
+	</head>
+	<body>
+		<div id="topbar">
+			<div id="nav">
+				<select id="files">
+				
+				<option value="file0">github.com/example/mafia-event-service/cmd/server/server.go (0.0%)</option>
+				
+				<option value="file1">github.com/example/mafia-event-service/internal/controller/phase_transition_controller.go (100.0%)</option>
+				
+				<option value="file2">github.com/example/mafia-event-service/internal/controller/timer_controller.go (100.0%)</option>
+				
+				<option value="file3">github.com/example/mafia-event-service/internal/service/event_service.go (100.0%)</option>
+				
+				<option value="file4">github.com/example/mafia-event-service/internal/service/event_store.go (93.8%)</option>
+				
+				<option value="file5">github.com/example/mafia-event-service/internal/service/timer_manager.go (100.0%)</option>
+				
+				<option value="file6">github.com/example/mafia-event-service/main.go (0.0%)</option>
+				
+				</select>
+			</div>
+			<div id="legend">
+				<span>not tracked</span>
+			
+				<span class="cov0">not covered</span>
+				<span class="cov8">covered</span>
+			
+			</div>
+		</div>
+		<div id="content">
+		
+		<pre class="file" id="file0" style="display: none">package server
+
+import (
+        "log"
+        "os"
+        "github.com/example/mafia-event-service/internal/controller"
+        "github.com/example/mafia-event-service/internal/service"
+        "github.com/gin-contrib/cors"
+        "github.com/gin-gonic/gin"
+)
+
+func Run() <span class="cov0" title="0">{
+        r := gin.Default()
+        r.Use(cors.New(cors.Config{
+                AllowOrigins: []string{"*"},
+                AllowMethods: []string{"GET", "POST", "OPTIONS"},
+                AllowHeaders: []string{"Content-Type", "Authorization"},
+        }))
+
+        es :=service.GetEventStore()
+        tc := controller.NewTimerController(service.NewTimerManager(), es)
+        tc.RegisterTimerRoutes(r)
+        phaseController := controller.NewPhaseTransitionController(service.NewTimerManager())
+        phaseController.RegisterPhaseRoutes(r)
+        port := startPort()
+        log.Printf("Event Service is Starting on the port: %s", port)
+        if err := r.Run(":" + port); err != nil </span><span class="cov0" title="0">{
+                log.Fatalf("Event Service has failed to start: %v", err)
+        }</span>
+}
+
+func startPort() string <span class="cov0" title="0">{
+        if port := os.Getenv("PORT"); port != "" </span><span class="cov0" title="0">{
+                return port
+        }</span>
+        <span class="cov0" title="0">if port := os.Getenv("EVENT_SERVICE_PORT"); port != "" </span><span class="cov0" title="0">{
+                return port
+        }</span>
+        <span class="cov0" title="0">return "8081"</span>
+}</pre>
+		
+		<pre class="file" id="file1" style="display: none">package controller
+
+import (
+        "log"
+        "net/http"
+        "time"
+
+        "github.com/example/mafia-event-service/internal/models"
+        "github.com/example/mafia-event-service/internal/service"
+        "github.com/gin-gonic/gin"
+)
+
+type PhaseTransitionController struct {
+        timerManager *service.TimerManager
+}
+
+func NewPhaseTransitionController(timerManager *service.TimerManager) *PhaseTransitionController <span class="cov8" title="1">{
+        return &amp;PhaseTransitionController{
+                timerManager: timerManager,
+        }
+}</span>
+
+func (ptc *PhaseTransitionController) RegisterPhaseRoutes(r *gin.Engine) <span class="cov8" title="1">{
+        r.POST("/api/phase/:roomId/start", ptc.StartPhaseTimer)
+        r.POST("/api/phase/:roomId/transition", ptc.TransitionPhase)
+        r.GET("/api/phase/:roomId/status", ptc.GetPhaseStatus)
+        r.POST("/api/phase/:roomId/cancel", ptc.CancelPhaseTimer)
+}</span>
+
+func (ptc *PhaseTransitionController) StartPhaseTimer(c *gin.Context) <span class="cov8" title="1">{
+        roomID := c.Param("roomId")
+        var req struct {
+                Phase       string `json:"phase" binding:"required"`
+                DurationSec int    `json:"durationSeconds" binding:"required,min=1"`
+        }
+        if err := c.ShouldBindJSON(&amp;req); err != nil </span><span class="cov8" title="1">{
+                log.Printf("StartPhaseTimer bad request room=%s: %v", roomID, err)
+                c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+                return
+        }</span>
+        <span class="cov8" title="1">ptc.timerManager.StartTimer(roomID, req.Phase, req.DurationSec)
+        log.Printf("StartPhaseTimer timer started room=%s phase=%s duration=%ds", roomID, req.Phase, req.DurationSec)
+        c.JSON(http.StatusOK, gin.H{
+                "roomId":   roomID,
+                "phase":    req.Phase,
+                "duration": req.DurationSec,
+                "message":  "Phase timer started",
+        })</span>
+}
+
+func (ptc *PhaseTransitionController) TransitionPhase(c *gin.Context) <span class="cov8" title="1">{
+        roomID := c.Param("roomId")
+        var req struct {
+                NextPhase string `json:"nextPhase" binding:"required"`
+        }
+        if err := c.ShouldBindJSON(&amp;req); err != nil </span><span class="cov8" title="1">{
+                log.Printf("TransitionPhase bad request room=%s: %v", roomID, err)
+                c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+                return
+        }</span>
+        <span class="cov8" title="1">ptc.timerManager.StopTimer(roomID)
+        log.Printf("TransitionPhase transition room=%s nextPhase=%s", roomID, req.NextPhase)
+        c.JSON(http.StatusOK, models.PhaseTransitionEvent{
+                RoomID:    roomID,
+                NextPhase: req.NextPhase,
+                Timestamp: time.Now().UTC(),
+        })</span>
+}
+
+func (ptc *PhaseTransitionController) GetPhaseStatus(c *gin.Context) <span class="cov8" title="1">{
+        roomID := c.Param("roomId")
+        timer := ptc.timerManager.GetTimer(roomID)
+        if timer == nil </span><span class="cov8" title="1">{
+                log.Printf("GetPhaseStatus no active timer room=%s", roomID)
+                c.JSON(http.StatusNotFound, gin.H{"error": "no active timer for room"})
+                return
+        }</span>
+        <span class="cov8" title="1">c.JSON(http.StatusOK, models.TimerSnapshot{
+                RoomID:        roomID,
+                Phase:         timer.CurrentPhase,
+                RemainingTime: timer.RemainingTime,
+                UpdatedAt:     time.Now().UTC(),
+        })</span>
+}
+
+func (ptc *PhaseTransitionController) CancelPhaseTimer(c *gin.Context) <span class="cov8" title="1">{
+        roomID := c.Param("roomId")
+        ptc.timerManager.StopTimer(roomID)
+        log.Printf("CancelPhaseTimer timer cancelled room=%s", roomID)
+        c.JSON(http.StatusOK, gin.H{
+                "roomId":  roomID,
+                "message": "Phase timer cancelled",
+        })
+}</pre>
+		
+		<pre class="file" id="file2" style="display: none">package controller
+
+import (
+        "net/http"
+
+        "github.com/example/mafia-event-service/internal/service"
+        "github.com/gin-gonic/gin"
+)
+type TimerController struct {
+    timerManager *service.TimerManager
+    eventStore   *service.EventStore 
+}
+
+func NewTimerController(tm *service.TimerManager, es *service.EventStore) *TimerController <span class="cov8" title="1">{
+    return &amp;TimerController{timerManager: tm, eventStore: es}
+}</span>
+
+func (tc *TimerController) RegisterTimerRoutes(r *gin.Engine) <span class="cov8" title="1">{
+    r.GET("/api/health", tc.Health)
+    r.GET("/api/timer/:roomId", tc.GetTimerSnapshot)
+    r.GET("/api/events/:roomId", tc.GetEventFeed)
+    r.POST("/api/events/:roomId", tc.PushEvent)
+}</span>
+
+func (tc *TimerController) Health(c *gin.Context) <span class="cov8" title="1">{
+    c.JSON(http.StatusOK, gin.H{"status": "ok", "service": "mafia-event-service"})
+}</span>
+
+func (tc *TimerController) GetTimerSnapshot(c *gin.Context) <span class="cov8" title="1">{
+    snap := service.BuildTimerSnapshotFromManager(c.Param("roomId"), tc.timerManager)
+    c.JSON(http.StatusOK, snap)
+}</span>
+
+func (tc *TimerController) GetEventFeed(c *gin.Context) <span class="cov8" title="1">{
+    c.JSON(http.StatusOK, service.BuildEventFeed(c.Param("roomId"),tc.eventStore))
+}</span>
+
+func (tc *TimerController) PushEvent(c *gin.Context) <span class="cov8" title="1">{
+    var req struct {
+        EventType   string `json:"type"        binding:"required"`
+        Description string `json:"description"`
+    }
+    if err := c.ShouldBindJSON(&amp;req); err != nil </span><span class="cov8" title="1">{
+        c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+        return
+    }</span>
+    <span class="cov8" title="1">tc.eventStore.PushEvent(c.Param("roomId"), req.EventType, req.Description)
+    c.JSON(http.StatusOK, gin.H{"status": "event-pushed"})</span>
+}</pre>
+		
+		<pre class="file" id="file3" style="display: none">package service
+
+import (
+        "time"
+        "github.com/example/mafia-event-service/internal/models"
+)
+func BuildEventFeed(roomID string, es *EventStore) []models.EventFeedItem <span class="cov8" title="1">{
+        return es.GetEvents(roomID)
+}</span>
+func BuildTimerSnapshotFromManager(roomID string, tm *TimerManager) models.TimerSnapshot <span class="cov8" title="1">{
+        timer := tm.GetTimer(roomID)
+        phase := "LOBBY"
+        remaining := 0
+        if timer != nil </span><span class="cov8" title="1">{
+                phase = timer.CurrentPhase
+                remaining = timer.RemainingTime
+        }</span>
+        <span class="cov8" title="1">return models.TimerSnapshot{
+                RoomID:        roomID,
+                Phase:         phase,
+                RemainingTime: remaining,
+                UpdatedAt:     time.Now().UTC(),
+        }</span>
+}
+</pre>
+		
+		<pre class="file" id="file4" style="display: none">package service
+
+import (
+        "sync"
+        "time"
+
+        "github.com/example/mafia-event-service/internal/models"
+)
+type EventStore struct {
+        mu     sync.RWMutex
+        events map[string][]models.EventFeedItem
+}
+var globalEventStore = &amp;EventStore{
+        events: make(map[string][]models.EventFeedItem),
+}
+func GetEventStore() *EventStore <span class="cov0" title="0">{ 
+        return globalEventStore 
+}</span>
+func NewEventStore() *EventStore <span class="cov8" title="1">{
+        return &amp;EventStore{events: make(map[string][]models.EventFeedItem)}
+}</span>
+
+func (es *EventStore) PushEvent(roomID, eventType, description string) <span class="cov8" title="1">{
+        es.mu.Lock()
+        defer es.mu.Unlock()
+        item := models.EventFeedItem{
+                RoomID:      roomID,
+                Event:       eventType,
+                Description: description,
+                At:          time.Now().UTC(),
+        }
+        es.events[roomID] = append(es.events[roomID], item)
+        if len(es.events[roomID]) &gt; 50 </span><span class="cov8" title="1">{
+                es.events[roomID] = es.events[roomID][len(es.events[roomID])-50:]
+        }</span>
+}
+
+func (es *EventStore) GetEvents(roomID string) []models.EventFeedItem <span class="cov8" title="1">{
+        es.mu.RLock()
+        defer es.mu.RUnlock()
+        items := es.events[roomID]
+        if items == nil </span><span class="cov8" title="1">{
+                return []models.EventFeedItem{}
+        }</span>
+        // Return a copy
+        <span class="cov8" title="1">out := make([]models.EventFeedItem, len(items))
+        copy(out, items)
+        return out</span>
+}
+</pre>
+		
+		<pre class="file" id="file5" style="display: none">package service
+import (
+        "sync"
+        "time"
+)
+type TimerManager struct {
+        timers map[string]*RoomTimer
+        mu     sync.RWMutex
+}
+type RoomTimer struct {
+        RoomID           string
+        CurrentPhase     string
+        PhaseStartTime   time.Time
+        PhaseDurationSec int
+        RemainingTime    int
+        ticker           *time.Ticker
+}
+
+func NewTimerManager() *TimerManager <span class="cov8" title="1">{
+        return &amp;TimerManager{
+                timers: make(map[string]*RoomTimer),
+        }
+}</span>
+func (tm *TimerManager) StartTimer(roomID string, phase string, durationSec int) <span class="cov8" title="1">{
+        tm.mu.Lock()
+        defer tm.mu.Unlock()
+
+        if existing, ok := tm.timers[roomID]; ok </span><span class="cov8" title="1">{
+                existing.Stop()
+        }</span>
+        <span class="cov8" title="1">timer := &amp;RoomTimer{
+                RoomID:           roomID,
+                CurrentPhase:     phase,
+                PhaseStartTime:   time.Now(),
+                PhaseDurationSec: durationSec,
+                RemainingTime:    durationSec,
+        }
+        timer.ticker = time.NewTicker(1 * time.Second)
+        tm.timers[roomID] = timer
+        go func() </span><span class="cov8" title="1">{
+                for range timer.ticker.C </span><span class="cov8" title="1">{
+                        tm.mu.Lock()
+                        timer.RemainingTime--
+                        if timer.RemainingTime &lt;= 0 </span><span class="cov8" title="1">{
+                                timer.Stop()
+                                delete(tm.timers, roomID) 
+                                tm.mu.Unlock()
+                                break</span>
+                        }
+                        <span class="cov8" title="1">tm.mu.Unlock()</span>
+                }
+        }()
+}
+func (tm *TimerManager) GetTimer(roomID string) *RoomTimer <span class="cov8" title="1">{
+        tm.mu.RLock()
+        defer tm.mu.RUnlock()
+        return tm.timers[roomID]
+}</span>
+func (tm *TimerManager) StopTimer(roomID string) <span class="cov8" title="1">{
+        tm.mu.Lock()
+        defer tm.mu.Unlock()
+
+        if timer, ok := tm.timers[roomID]; ok </span><span class="cov8" title="1">{
+                timer.Stop()
+                delete(tm.timers, roomID)
+        }</span>
+}
+func (rt *RoomTimer) Stop() <span class="cov8" title="1">{
+        if rt.ticker != nil </span><span class="cov8" title="1">{
+                rt.ticker.Stop()
+        }</span>
+}</pre>
+		
+		<pre class="file" id="file6" style="display: none">package main
+
+import "github.com/example/mafia-event-service/cmd/server"
+
+func main() <span class="cov0" title="0">{
+        server.Run()
+}</span>
+</pre>
+		
+		</div>
+	</body>
+	<script>
+	(function() {
+		var files = document.getElementById('files');
+		var visible;
+		files.addEventListener('change', onChange, false);
+		function select(part) {
+			if (visible)
+				visible.style.display = 'none';
+			visible = document.getElementById(part);
+			if (!visible)
+				return;
+			files.value = part;
+			visible.style.display = 'block';
+			location.hash = part;
+		}
+		function onChange() {
+			select(files.value);
+			window.scrollTo(0, 0);
+		}
+		if (location.hash != "") {
+			select(location.hash.substr(1));
+		}
+		if (!visible) {
+			select("file0");
+		}
+	})();
+	</script>
+</html>
