@@ -3,7 +3,6 @@ module github.com/example/mafia-event-service
 go 1.25.0
 
 require (
-	github.com/gin-contrib/cors v1.7.7
 	github.com/gin-gonic/gin v1.12.0
 	github.com/stretchr/testify v1.11.1
 )

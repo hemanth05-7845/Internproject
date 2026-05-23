@@ -62,7 +62,9 @@ class GameSnapshot(BaseModel):
     room_code: str = ""
     host_username: str = ""
     phase_ends_at: str = ""
+    remaining_seconds: int = 0
     my_role: Optional[str] = None
+    mafia_members: list[str] = []
 
 
 def default_snapshot() -> GameSnapshot:

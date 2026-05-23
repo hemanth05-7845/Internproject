@@ -15,7 +15,7 @@ def reset_store():
 
 
 def _token(user: str = "user1") -> str:
-    return jwt_handler.create_access_token(user, "dev-secret", "HS256", 60)
+    return jwt_handler.create_access_token(user, "Hemanth-secret", "HS256", 60)
 
 
 def _auth(user: str = "user1") -> dict:

@@ -2,7 +2,7 @@ import os
 
 import httpx
 
-_ENGINE_HOST = os.getenv("SPRING_ENGINE_BASE_URL", "http://localhost:8080").rstrip("/")
+_ENGINE_HOST = os.getenv("SPRING_ENGINE_BASE_URL")
 _SPRING_BASE_URL = f"{_ENGINE_HOST}/api"
 
 _client = httpx.AsyncClient(base_url=_SPRING_BASE_URL, timeout=5.0)

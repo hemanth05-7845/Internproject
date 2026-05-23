@@ -1,4 +1,4 @@
-import { useCallback, useState, useRef } from "react";
+import { useCallback, useEffect, useState, useRef } from "react";
 import { useAuth } from "./context/AuthContext";
 import { useGameSocket } from "./hooks/useGameSocket";
 import HomePage from "./pages/Home/HomePage";
@@ -41,6 +41,9 @@ export default function App() {
     setRoomCode(info.room_code);
     setHostUsername(info.host_username);
     setView("LOBBY");
+    localStorage.setItem("mafia_room_id", info.room_id);
+    localStorage.setItem("mafia_room_code", info.room_code);
+    localStorage.setItem("mafia_host_username", info.host_username);
   }, []);
 
   const handleEnterGame = useCallback(() => {
@@ -51,8 +54,22 @@ export default function App() {
   const handleRestart = useCallback(() => {
     // Full page reload: kills all WebSocket connections and React state.
     // localStorage keeps the token so user stays "logged in".
+    localStorage.removeItem("mafia_room_id");
+    localStorage.removeItem("mafia_room_code");
+    localStorage.removeItem("mafia_host_username");
     window.location.reload();
   }, []);
+
+  useEffect(() => {
+    if (!token || roomId) return;
+    const storedRoomId = localStorage.getItem("mafia_room_id") || "";
+    if (!storedRoomId) return;
+    activeRef.current = true;
+    setRoomId(storedRoomId);
+    setRoomCode(localStorage.getItem("mafia_room_code"));
+    setHostUsername(localStorage.getItem("mafia_host_username"));
+    setView("LOBBY");
+  }, [token, roomId]);
 
   return (
     <main>

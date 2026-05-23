@@ -1,6 +1,7 @@
 package com.mafia.service;
 
 import com.mafia.dto.response.AggregatedGameSnapshot;
+import com.mafia.client.EventServiceClient;
 import com.mafia.entity.GameEvent;
 import com.mafia.entity.GameState;
 import com.mafia.entity.Player;
@@ -22,6 +23,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.util.List;
 import java.util.Optional;
+import java.util.stream.Collectors;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
@@ -42,15 +44,19 @@ class GameStateServiceTest {
     RoomRepository roomRepository;
     @Mock
     WinConditionService winConditionService;
+    @Mock
+    EventServiceClient eventServiceClient;
 
     @InjectMocks
     GameStateService service;
 
     @Test
-    void initializeGameState_savesGameStateAndEvent() {
+    void TestShouldInitializeGameStateAndSaveEvent() {
         service.initializeGameState("room-1");
 
-        verify(gameStateRepository).save(any(GameState.class));
+        ArgumentCaptor<GameState> gsCaptor = ArgumentCaptor.forClass(GameState.class);
+        verify(gameStateRepository).save(gsCaptor.capture());
+        assertEquals("room-1", gsCaptor.getValue().getRoomId());
 
         ArgumentCaptor<GameEvent> captor = ArgumentCaptor.forClass(GameEvent.class);
         verify(gameEventRepository).save(captor.capture());
@@ -58,21 +64,23 @@ class GameStateServiceTest {
     }
 
     @Test
-    void requireGameState_returnsGameState_whenFound() {
+    void TestShouldReturnGameStateWhenFound() {
         GameState gs = new GameState("room-1");
         when(gameStateRepository.findByRoomId("room-1")).thenReturn(Optional.of(gs));
 
         GameState result = service.requireGameState("room-1");
+        verify(gameStateRepository).findByRoomId("room-1");
 
         assertNotNull(result);
     }
 
     @Test
-    void requireGameState_throwsIllegalArgumentException_whenNotFound() {
+    void TestShouldThrowIllegalArgumentExceptionWhenGameNotFound() {
         when(gameStateRepository.findByRoomId("room-1")).thenReturn(Optional.empty());
 
         IllegalArgumentException ex = assertThrows(IllegalArgumentException.class,
                 () -> service.requireGameState("room-1"));
+        verify(gameStateRepository).findByRoomId("room-1");
 
         assertTrue(ex.getMessage().contains("Game not found"));
     }
@@ -87,14 +95,15 @@ class GameStateServiceTest {
             "LOBBY,     SUNRISE,   false",
             "POLICE_GUESS, SUNRISE, false"
     })
-    void isAtOrAfter_returnsCorrectResult(String phase, String target, boolean expected) {
+    void TestShouldReturnCorrectResultForIsAtOrAfter(String phase, String target, boolean expected) {
         assertEquals(expected, service.isAtOrAfter(phase, target));
     }
 
     @Test
-    void startGame_throwsIllegalStateException_whenNotEnoughPlayers() {
+    void TestShouldThrowIllegalStateExceptionWhenNotEnoughPlayers() {
         GameState gs = new GameState("room-1");
         when(gameStateRepository.findByRoomId("room-1")).thenReturn(Optional.of(gs));
+        when(roomRepository.findById("room-1")).thenReturn(Optional.of(testRoom()));
         when(playerRepository.findByRoomId("room-1")).thenReturn(List.of(
                 new Player("p1", "room-1"),
                 new Player("p2", "room-1")));
@@ -107,17 +116,34 @@ class GameStateServiceTest {
     }
 
     @Test
-    void startGame_assignsRolesAndSetsNightPhase_whenEnoughPlayers() {
+    void TestShouldAssignRolesAndSetNightPhaseWhenEnoughPlayers() {
         GameState gs = new GameState("room-1");
         when(gameStateRepository.findByRoomId("room-1")).thenReturn(Optional.of(gs));
+        Room room = testRoom();
+        when(roomRepository.findById("room-1")).thenReturn(Optional.of(room));
         when(playerRepository.findByRoomId("room-1")).thenReturn(sixPlayers());
 
         service.startGame("room-1");
 
         assertEquals("NIGHT", gs.getPhase());
         assertEquals(1, gs.getNightNumber());
-        verify(playerRepository, times(6)).save(any(Player.class));
+
+        ArgumentCaptor<Player> playerCaptor = ArgumentCaptor.forClass(Player.class);
+        verify(playerRepository, times(6)).save(playerCaptor.capture());
+        List<Player> savedPlayers = playerCaptor.getAllValues();
+        assertEquals(6, savedPlayers.size());
+        List<String> assignedRoles = savedPlayers.stream()
+            .map(Player::getRole)
+            .collect(Collectors.toList());
+        assertTrue(assignedRoles.contains("MAFIA"));
+        assertTrue(assignedRoles.contains("POLICE"));
+        assertTrue(assignedRoles.contains("DOCTOR"));
+        assertTrue(assignedRoles.contains("VILLAGER"));
+
         verify(gameStateRepository).save(gs);
+        assertEquals("IN_GAME", room.getStatus());
+        verify(roomRepository).save(room);
+
         ArgumentCaptor<GameEvent> captor = ArgumentCaptor.forClass(GameEvent.class);
         verify(gameEventRepository).save(captor.capture());
         assertEquals("GAME_STARTED", captor.getValue().getEventType());
@@ -125,7 +151,7 @@ class GameStateServiceTest {
     }
 
     @Test
-    void startGame_throwsIllegalArgumentException_whenGameNotFound() {
+    void TestShouldThrowIllegalArgumentExceptionWhenGameandRoomNotFound() {
         when(gameStateRepository.findByRoomId("room-1")).thenReturn(Optional.empty());
 
         assertThrows(IllegalArgumentException.class,
@@ -133,7 +159,7 @@ class GameStateServiceTest {
     }
 
     @Test
-    void getSnapshot_hidesNightData_whenPhaseIsBeforeSunrise() {
+    void TestShouldHideNightDataWhenPhaseIsBeforeSunrise() {
         GameState gs = gameStateWithPhase("NIGHT");
         gs.setNightKillTarget("targetA");
         gs.setPoliceGuessTarget("suspectB");
@@ -154,7 +180,7 @@ class GameStateServiceTest {
     }
 
     @Test
-    void getSnapshot_revealsNightData_whenPhaseIsAtOrAfterSunrise() {
+    void TestShouldRevealNightDataWhenPhaseIsAtOrAfterSunrise() {
         GameState gs = gameStateWithPhase("SUNRISE");
         gs.setNightKillTarget("targetA");
         gs.setPoliceGuessTarget("suspectB");
@@ -174,7 +200,7 @@ class GameStateServiceTest {
     }
 
     @Test
-    void getSnapshot_hidesPoliceGuess_whenPoliceGuessIncorrect() {
+    void TestShouldHidePoliceGuessWhenGuessIsIncorrect() {
         GameState gs = gameStateWithPhase("SUNRISE");
         gs.setPoliceGuessTarget("suspectB");
         gs.setPoliceGuessCorrect(false);
@@ -187,11 +213,11 @@ class GameStateServiceTest {
 
         AggregatedGameSnapshot snap = service.getSnapshot("room-1");
 
-        assertNull(snap.policeGuessTarget()); // only revealed when correct
+        assertNull(snap.policeGuessTarget()); 
     }
 
     @Test
-    void getSnapshot_throwsIllegalArgumentException_whenRoomNotFound() {
+    void TestShouldThrowIllegalArgumentExceptionWhenRoomNotFound() {
         GameState gs = gameStateWithPhase("LOBBY");
         when(gameStateRepository.findByRoomId("room-1")).thenReturn(Optional.of(gs));
         when(roomRepository.findById("room-1")).thenReturn(Optional.empty());
@@ -209,7 +235,7 @@ class GameStateServiceTest {
             "VOTING,       submit_vote",
             "GAME_OVER,    restart"
     })
-    void getSnapshot_includesCorrectAvailableAction_forPhase(String phase, String expectedAction) {
+    void TestShouldIncludeCorrectAvailableActionForPhase(String phase, String expectedAction) {
         GameState gs = gameStateWithPhase(phase);
         when(gameStateRepository.findByRoomId("room-1")).thenReturn(Optional.of(gs));
         when(roomRepository.findById("room-1")).thenReturn(Optional.of(testRoom()));

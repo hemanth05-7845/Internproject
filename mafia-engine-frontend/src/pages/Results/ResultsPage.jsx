@@ -39,7 +39,14 @@ export default function ResultsPage({ snapshot, onRestart }) {
         <button
           id="btn-play-again"
           className="btn btn-primary btn-lg btn-full"
-          onClick={() => window.location.reload()}
+          onClick={() => {
+            localStorage.removeItem("mafia_room_id");
+            localStorage.removeItem("mafia_room_code");
+            localStorage.removeItem("mafia_host_username");
+            localStorage.removeItem("mafia_token");
+            localStorage.removeItem("mafia_username");
+            window.location.reload();
+          }}
         >
           Play Again
         </button>

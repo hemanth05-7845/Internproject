@@ -4,6 +4,7 @@ import {
   advancePhase, resolveVoting,
   submitVote, submitNightKill, submitPoliceGuess, submitDoctorSave, sendMessage,
 } from "../../services/gameService";
+import Timer from "../../components/timer/Timer";
 import "./GameRoomPage.css";
 
 function WaitingForHost({ hostUsername }) {
@@ -33,10 +34,17 @@ export default function GameRoomPage({ roomId, roomCode, snapshot, hostUsername 
   const policeCorrect  = snapshot?.police_guess_correct;
   const dayNumber      = snapshot?.day_number      || 0;
   const nightNumber    = snapshot?.night_number    || 0;
-  const isHost         = username === hostUsername;
+  const remainingSeconds = snapshot?.remaining_seconds;
+  const storedHost     = localStorage.getItem("mafia_host_username") || "";
+  const effectiveHost  = hostUsername || snapshot?.host_username || storedHost;
+  const isHost         = username && effectiveHost
+    ? username.toLowerCase() === effectiveHost.toLowerCase()
+    : false;
   const canChat        = alivePlayers.includes(username);
+  const mafiaMembers   = snapshot?.mafia_members   || [];
 
   const others = alivePlayers.filter(n => n !== username);
+  const mafiaTargets = others.filter(n => !mafiaMembers.includes(n));
 
   // Reset action flag on every phase change
   useEffect(() => { setActionDone(false); }, [phase]);
@@ -54,6 +62,15 @@ export default function GameRoomPage({ roomId, roomCode, snapshot, hostUsername 
   const doNightKill= (t) => act(() => submitNightKill(token, roomId, t));
   const doPolice   = (t) => act(() => submitPoliceGuess(token, roomId, t));
   const doDoctor   = (t) => act(() => submitDoctorSave(token, roomId, t));
+
+  const handleLeaveRoom = () => {
+    localStorage.removeItem("mafia_room_id");
+    localStorage.removeItem("mafia_room_code");
+    localStorage.removeItem("mafia_host_username");
+    localStorage.removeItem("mafia_token");
+    localStorage.removeItem("mafia_username");
+    window.location.reload();
+  };
 
   // Chat
   const [chatInput, setChatInput] = useState("");
@@ -82,6 +99,7 @@ export default function GameRoomPage({ roomId, roomCode, snapshot, hostUsername 
         <div className="header-left">
           <span className="room-code-sm">{roomCode}</span>
           <span className={`phase-badge phase-${phase}`}>{phase.replace("_", " ")}</span>
+          <Timer seconds={remainingSeconds ?? 30} />
           {dayNumber > 0 && <span className="day-tag">Day {dayNumber}</span>}
           {nightNumber > 0 && <span className="night-tag">Night {nightNumber}</span>}
         </div>
@@ -92,6 +110,10 @@ export default function GameRoomPage({ roomId, roomCode, snapshot, hostUsername 
               {myRole}
             </div>
           )}
+          <button id="btn-leave-room" className="btn btn-secondary"
+            onClick={handleLeaveRoom}>
+            Leave Room
+          </button>
         </div>
       </header>
 
@@ -104,7 +126,7 @@ export default function GameRoomPage({ roomId, roomCode, snapshot, hostUsername 
               <div key={i} className={`player-row ${!p.alive ? "dead" : ""} ${p.name === username ? "me" : ""}`}>
                 <span className="player-avatar">{p.name?.[0]?.toUpperCase()}</span>
                 <span className="player-name-col">{p.name}</span>
-                {p.name === hostUsername && <span className="host-dot" title="Host" />}
+                {effectiveHost && p.name === effectiveHost && <span className="host-dot" title="Host" />}
                 {/* Only reveal roles after game ends */}
                 {phase === "GAME_OVER" && p.role && <span className={`role-chip role-${p.role}`}>{p.role}</span>}
               </div>
@@ -128,7 +150,7 @@ export default function GameRoomPage({ roomId, roomCode, snapshot, hostUsername 
                 <>
                   <p className="phase-desc">Select a player to eliminate.</p>
                   <div className="target-list">
-                    {others.map(n => (
+                    {mafiaTargets.map(n => (
                       <button key={n} id={`kill-${n}`} className="target-btn kill-btn"
                         onClick={() => doNightKill(n)} disabled={busy}>
                         {n}
@@ -149,7 +171,7 @@ export default function GameRoomPage({ roomId, roomCode, snapshot, hostUsername 
                   {busy ? "…" : "Advance to Police Phase"}
                 </button>
               )}
-              {!isHost && <WaitingForHost hostUsername={hostUsername} />}
+              {!isHost && <WaitingForHost hostUsername={effectiveHost || "host"} />}
             </div>
           )}
 
@@ -162,7 +184,7 @@ export default function GameRoomPage({ roomId, roomCode, snapshot, hostUsername 
                   <p className="phase-desc">Select who you believe is Mafia.</p>
                   <div className="target-list">
                     {players
-                      .filter(p => p.name !== username)
+                      .filter(p => p.alive && p.name !== username)
                       .map(p => (
                         <button key={p.name} id={`guess-${p.name}`} className="target-btn police-btn"
                           onClick={() => doPolice(p.name)} disabled={busy}>
@@ -184,7 +206,7 @@ export default function GameRoomPage({ roomId, roomCode, snapshot, hostUsername 
                   Proceed to Doctor Phase
                 </button>
               )}
-              {!isHost && <WaitingForHost hostUsername={hostUsername} />}
+              {!isHost && <WaitingForHost hostUsername={effectiveHost || "host"} />}
             </div>
           )}
 
@@ -217,7 +239,7 @@ export default function GameRoomPage({ roomId, roomCode, snapshot, hostUsername 
                   Proceed to Sunrise
                 </button>
               )}
-              {!isHost && <WaitingForHost hostUsername={hostUsername} />}
+              {!isHost && <WaitingForHost hostUsername={effectiveHost || "host"} />}
             </div>
           )}
 
@@ -256,7 +278,7 @@ export default function GameRoomPage({ roomId, roomCode, snapshot, hostUsername 
                   Start Day Discussion
                 </button>
               )}
-              {!isHost && <WaitingForHost hostUsername={hostUsername} />}
+              {!isHost && <WaitingForHost hostUsername={effectiveHost || "host"} />}
             </div>
           )}
 
@@ -279,7 +301,7 @@ export default function GameRoomPage({ roomId, roomCode, snapshot, hostUsername 
                   Start Voting
                 </button>
               )}
-              {!isHost && <WaitingForHost hostUsername={hostUsername} />}
+              {!isHost && <WaitingForHost hostUsername={effectiveHost || "host"} />}
             </div>
           )}
 
@@ -307,7 +329,7 @@ export default function GameRoomPage({ roomId, roomCode, snapshot, hostUsername 
                   Close Voting
                 </button>
               )}
-              {!isHost && !actionDone && <WaitingForHost hostUsername={hostUsername} />}
+              {!isHost && !actionDone && <WaitingForHost hostUsername={effectiveHost || "host"} />}
             </div>
           )}
 
@@ -316,6 +338,13 @@ export default function GameRoomPage({ roomId, roomCode, snapshot, hostUsername 
               <div className="phase-kicker">Voting</div>
               <h2>Vote to Eliminate</h2>
               <p className="phase-desc muted-msg">You are not eligible to vote in this round.</p>
+              {isHost && (
+                <button id="btn-close-voting" className="btn btn-primary host-btn"
+                  onClick={doResolve} disabled={busy}>
+                  Close Voting
+                </button>
+              )}
+              {!isHost && <WaitingForHost hostUsername={effectiveHost || "host"} />}
             </div>
           )}
 

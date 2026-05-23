@@ -24,6 +24,7 @@ services:
     environment:
       SPRING_PROFILES_ACTIVE: ${SPRING_PROFILES_ACTIVE}
       SPRING_DATA_MONGODB_URI: ${SPRING_DATA_MONGODB_URI}
+      GIN_EVENT_BASE_URL: ${GIN_EVENT_BASE_URL}
     volumes:
       - ./mafia-game-engine:/workspace
       - maven_cache:/root/.m2
@@ -40,6 +41,8 @@ services:
     command: sh -c "go mod tidy && go run ./main.go"
     environment:
       EVENT_SERVICE_PORT: ${EVENT_SERVICE_PORT}
+      EVENT_MONGODB_URI: ${SPRING_DATA_MONGODB_URI}
+      MONGO_DATABASE: ${MONGO_DATABASE}
     volumes:
       - ./mafia-event-service:/workspace
     ports:

@@ -84,12 +84,12 @@
 		<pre class="file" id="file0" style="display: none">package server
 
 import (
-        "log"
-        "os"
         "github.com/example/mafia-event-service/internal/controller"
         "github.com/example/mafia-event-service/internal/service"
         "github.com/gin-contrib/cors"
         "github.com/gin-gonic/gin"
+        "log"
+        "os"
 )
 
 func Run() <span class="cov0" title="0">{
@@ -99,8 +99,7 @@ func Run() <span class="cov0" title="0">{
                 AllowMethods: []string{"GET", "POST", "OPTIONS"},
                 AllowHeaders: []string{"Content-Type", "Authorization"},
         }))
-
-        es :=service.GetEventStore()
+        es := service.GetEventStore()
         tc := controller.NewTimerController(service.NewTimerManager(), es)
         tc.RegisterTimerRoutes(r)
         phaseController := controller.NewPhaseTransitionController(service.NewTimerManager())
@@ -120,7 +119,8 @@ func startPort() string <span class="cov0" title="0">{
                 return port
         }</span>
         <span class="cov0" title="0">return "8081"</span>
-}</pre>
+}
+</pre>
 		
 		<pre class="file" id="file1" style="display: none">package controller
 
@@ -215,7 +215,8 @@ func (ptc *PhaseTransitionController) CancelPhaseTimer(c *gin.Context) <span cla
                 "roomId":  roomID,
                 "message": "Phase timer cancelled",
         })
-}</pre>
+}</span>
+</pre>
 		
 		<pre class="file" id="file2" style="display: none">package controller
 
@@ -225,54 +226,57 @@ import (
         "github.com/example/mafia-event-service/internal/service"
         "github.com/gin-gonic/gin"
 )
+
 type TimerController struct {
-    timerManager *service.TimerManager
-    eventStore   *service.EventStore 
+        timerManager *service.TimerManager
+        eventStore   *service.EventStore
 }
 
 func NewTimerController(tm *service.TimerManager, es *service.EventStore) *TimerController <span class="cov8" title="1">{
-    return &amp;TimerController{timerManager: tm, eventStore: es}
+        return &amp;TimerController{timerManager: tm, eventStore: es}
 }</span>
 
 func (tc *TimerController) RegisterTimerRoutes(r *gin.Engine) <span class="cov8" title="1">{
-    r.GET("/api/health", tc.Health)
-    r.GET("/api/timer/:roomId", tc.GetTimerSnapshot)
-    r.GET("/api/events/:roomId", tc.GetEventFeed)
-    r.POST("/api/events/:roomId", tc.PushEvent)
+        r.GET("/api/health", tc.Health)
+        r.GET("/api/timer/:roomId", tc.GetTimerSnapshot)
+        r.GET("/api/events/:roomId", tc.GetEventFeed)
+        r.POST("/api/events/:roomId", tc.PushEvent)
 }</span>
 
 func (tc *TimerController) Health(c *gin.Context) <span class="cov8" title="1">{
-    c.JSON(http.StatusOK, gin.H{"status": "ok", "service": "mafia-event-service"})
+        c.JSON(http.StatusOK, gin.H{"status": "ok", "service": "mafia-event-service"})
 }</span>
 
 func (tc *TimerController) GetTimerSnapshot(c *gin.Context) <span class="cov8" title="1">{
-    snap := service.BuildTimerSnapshotFromManager(c.Param("roomId"), tc.timerManager)
-    c.JSON(http.StatusOK, snap)
+        snap := service.BuildTimerSnapshotFromManager(c.Param("roomId"), tc.timerManager)
+        c.JSON(http.StatusOK, snap)
 }</span>
 
 func (tc *TimerController) GetEventFeed(c *gin.Context) <span class="cov8" title="1">{
-    c.JSON(http.StatusOK, service.BuildEventFeed(c.Param("roomId"),tc.eventStore))
+        c.JSON(http.StatusOK, service.BuildEventFeed(c.Param("roomId"), tc.eventStore))
 }</span>
 
 func (tc *TimerController) PushEvent(c *gin.Context) <span class="cov8" title="1">{
-    var req struct {
-        EventType   string `json:"type"        binding:"required"`
-        Description string `json:"description"`
-    }
-    if err := c.ShouldBindJSON(&amp;req); err != nil </span><span class="cov8" title="1">{
-        c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
-        return
-    }</span>
-    <span class="cov8" title="1">tc.eventStore.PushEvent(c.Param("roomId"), req.EventType, req.Description)
-    c.JSON(http.StatusOK, gin.H{"status": "event-pushed"})</span>
-}</pre>
+        var req struct {
+                EventType   string `json:"type"        binding:"required"`
+                Description string `json:"description"`
+        }
+        if err := c.ShouldBindJSON(&amp;req); err != nil </span><span class="cov8" title="1">{
+                c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+                return
+        }</span>
+        <span class="cov8" title="1">tc.eventStore.PushEvent(c.Param("roomId"), req.EventType, req.Description)
+        c.JSON(http.StatusOK, gin.H{"status": "event-pushed"})</span>
+}
+</pre>
 		
 		<pre class="file" id="file3" style="display: none">package service
 
 import (
-        "time"
         "github.com/example/mafia-event-service/internal/models"
+        "time"
 )
+
 func BuildEventFeed(roomID string, es *EventStore) []models.EventFeedItem <span class="cov8" title="1">{
         return es.GetEvents(roomID)
 }</span>
@@ -301,15 +305,18 @@ import (
 
         "github.com/example/mafia-event-service/internal/models"
 )
+
 type EventStore struct {
         mu     sync.RWMutex
         events map[string][]models.EventFeedItem
 }
+
 var globalEventStore = &amp;EventStore{
         events: make(map[string][]models.EventFeedItem),
 }
-func GetEventStore() *EventStore <span class="cov0" title="0">{ 
-        return globalEventStore 
+
+func GetEventStore() *EventStore <span class="cov0" title="0">{
+        return globalEventStore
 }</span>
 func NewEventStore() *EventStore <span class="cov8" title="1">{
         return &amp;EventStore{events: make(map[string][]models.EventFeedItem)}
@@ -345,10 +352,12 @@ func (es *EventStore) GetEvents(roomID string) []models.EventFeedItem <span clas
 </pre>
 		
 		<pre class="file" id="file5" style="display: none">package service
+
 import (
         "sync"
         "time"
 )
+
 type TimerManager struct {
         timers map[string]*RoomTimer
         mu     sync.RWMutex
@@ -389,7 +398,7 @@ func (tm *TimerManager) StartTimer(roomID string, phase string, durationSec int)
                         timer.RemainingTime--
                         if timer.RemainingTime &lt;= 0 </span><span class="cov8" title="1">{
                                 timer.Stop()
-                                delete(tm.timers, roomID) 
+                                delete(tm.timers, roomID)
                                 tm.mu.Unlock()
                                 break</span>
                         }
@@ -415,7 +424,8 @@ func (rt *RoomTimer) Stop() <span class="cov8" title="1">{
         if rt.ticker != nil </span><span class="cov8" title="1">{
                 rt.ticker.Stop()
         }</span>
-}</pre>
+}
+</pre>
 		
 		<pre class="file" id="file6" style="display: none">package main
 

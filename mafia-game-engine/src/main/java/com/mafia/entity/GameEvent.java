@@ -10,7 +10,7 @@ public class GameEvent {
     @Id
     private String id;
     private String roomId;
-    private String eventType; // GAME_STARTED, ROLE_ASSIGNED, PLAYER_ELIMINATED, VOTE_CAST, PHASE_TRANSITIONED
+    private String eventType; 
     private String targetPlayerId;
     private String actor;
     private String description;

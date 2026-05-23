@@ -2,7 +2,7 @@ import os
 
 import httpx
 
-_GIN_BASE_URL = os.getenv("GIN_EVENT_BASE_URL", "http://localhost:8081/api").rstrip("/")
+_GIN_BASE_URL = os.getenv("GIN_EVENT_BASE_URL")
 
 _client = httpx.AsyncClient(base_url=_GIN_BASE_URL, timeout=5.0)
 

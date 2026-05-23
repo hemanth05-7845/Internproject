@@ -1,9 +1,8 @@
 import pytest
 from unittest.mock import AsyncMock, MagicMock, patch
-
+from app.services.spring_client import engine_client
 
 def _mock_response(payload):
-    """Build a fake httpx response whose .json() returns *payload*."""
     resp = MagicMock()
     resp.raise_for_status = MagicMock()
     resp.json = MagicMock(return_value=payload)
@@ -12,12 +11,6 @@ def _mock_response(payload):
 
 @pytest.fixture
 def mock_client(monkeypatch):
-    """
-    Patch the module-level _client instance directly.
-    The real code does `await _client.get(...)` / `await _client.post(...)`,
-    so we replace get/post with AsyncMocks.
-    """
-    from app.services.spring_client import engine_client
 
     client = MagicMock()
     client.get = AsyncMock()
@@ -29,7 +22,6 @@ def mock_client(monkeypatch):
 
 @pytest.mark.asyncio
 async def test_get_room_by_code(mock_client):
-    from app.services.spring_client import engine_client
 
     mock_client.get.return_value = _mock_response({"roomId": "room-1"})
 
@@ -41,7 +33,6 @@ async def test_get_room_by_code(mock_client):
 
 @pytest.mark.asyncio
 async def test_get_players_by_code(mock_client):
-    from app.services.spring_client import engine_client
 
     mock_client.get.return_value = _mock_response([{"username": "p1"}])
 
@@ -53,7 +44,6 @@ async def test_get_players_by_code(mock_client):
 
 @pytest.mark.asyncio
 async def test_get_game_state(mock_client):
-    from app.services.spring_client import engine_client
 
     mock_client.get.return_value = _mock_response({"phase": "DAY"})
 
@@ -65,7 +55,6 @@ async def test_get_game_state(mock_client):
 
 @pytest.mark.asyncio
 async def test_create_room(mock_client):
-    from app.services.spring_client import engine_client
 
     mock_client.post.return_value = _mock_response(
         {"roomId": "room-1", "hostUsername": "host1"}
@@ -82,7 +71,6 @@ async def test_create_room(mock_client):
 
 @pytest.mark.asyncio
 async def test_join_room_by_code(mock_client):
-    from app.services.spring_client import engine_client
 
     mock_client.post.return_value = _mock_response({"status": "ok"})
 
@@ -96,7 +84,6 @@ async def test_join_room_by_code(mock_client):
 
 @pytest.mark.asyncio
 async def test_start_game(mock_client):
-    from app.services.spring_client import engine_client
 
     mock_client.post.return_value = _mock_response({"status": "started"})
 
@@ -107,7 +94,6 @@ async def test_start_game(mock_client):
 
 @pytest.mark.asyncio
 async def test_advance_phase(mock_client):
-    from app.services.spring_client import engine_client
 
     mock_client.post.return_value = _mock_response({"phase": "NIGHT"})
 
@@ -118,7 +104,6 @@ async def test_advance_phase(mock_client):
 
 @pytest.mark.asyncio
 async def test_resolve_voting(mock_client):
-    from app.services.spring_client import engine_client
 
     mock_client.post.return_value = _mock_response({"eliminated": "p2"})
 
@@ -129,7 +114,6 @@ async def test_resolve_voting(mock_client):
 
 @pytest.mark.asyncio
 async def test_submit_night_kill(mock_client):
-    from app.services.spring_client import engine_client
 
     mock_client.post.return_value = _mock_response({"status": "ok"})
 
@@ -143,7 +127,6 @@ async def test_submit_night_kill(mock_client):
 
 @pytest.mark.asyncio
 async def test_submit_police_guess(mock_client):
-    from app.services.spring_client import engine_client
 
     mock_client.post.return_value = _mock_response({"isMafia": True})
 
@@ -157,7 +140,6 @@ async def test_submit_police_guess(mock_client):
 
 @pytest.mark.asyncio
 async def test_submit_doctor_save(mock_client):
-    from app.services.spring_client import engine_client
 
     mock_client.post.return_value = _mock_response({"status": "ok"})
 
@@ -171,7 +153,6 @@ async def test_submit_doctor_save(mock_client):
 
 @pytest.mark.asyncio
 async def test_submit_vote(mock_client):
-    from app.services.spring_client import engine_client
 
     mock_client.post.return_value = _mock_response({"status": "ok"})
 
@@ -185,7 +166,6 @@ async def test_submit_vote(mock_client):
 
 @pytest.mark.asyncio
 async def test_send_message(mock_client):
-    from app.services.spring_client import engine_client
 
     mock_client.post.return_value = _mock_response({"messageId": "m1"})
 
@@ -199,7 +179,7 @@ async def test_send_message(mock_client):
 
 @pytest.mark.asyncio
 async def test_raise_for_status_called_on_get(mock_client):
-    from app.services.spring_client import engine_client
+
 
     resp = _mock_response({"roomId": "x"})
     mock_client.get.return_value = resp
@@ -211,7 +191,6 @@ async def test_raise_for_status_called_on_get(mock_client):
 
 @pytest.mark.asyncio
 async def test_raise_for_status_called_on_post(mock_client):
-    from app.services.spring_client import engine_client
 
     resp = _mock_response({})
     mock_client.post.return_value = resp

@@ -39,14 +39,14 @@ class MessageControllerTest {
     static Stream<Arguments> postMessageScenarios() {
         return Stream.of(
                 Arguments.of(
-                        Named.of("success", (ServiceSetup) s -> when(s.postMessage("room-1", "userA", "hello there"))
+                        Named.of("TestShouldReturnSuccessProvidedValidInput", (ServiceSetup) s -> when(s.postMessage("room-1", "userA", "hello there"))
                                 .thenReturn(Map.of("status", "sent", "sender", "userA"))),
                         "hello there",
                         200,
                         jsonPath("$.status").value("sent"),
                         jsonPath("$.sender").value("userA")),
                 Arguments.of(
-                        Named.of("empty message returns 400",
+                        Named.of("TestShouldReturn400WhenEmptyMessageProvided",
                                 (ServiceSetup) s -> doThrow(new IllegalArgumentException("Empty message"))
                                         .when(s).postMessage("room-1", "userA", "   ")),
                         "   ",
@@ -54,7 +54,7 @@ class MessageControllerTest {
                         jsonPath("$.status").value("error"),
                         jsonPath("$.message").value("Empty message")),
                 Arguments.of(
-                        Named.of("illegal state returns 400",
+                        Named.of("TestShouldReturn400WhenIllegalStateProvided",
                                 (ServiceSetup) s -> doThrow(new IllegalStateException("Room closed"))
                                         .when(s).postMessage("room-1", "userA", "hello there")),
                         "hello there",
@@ -62,7 +62,7 @@ class MessageControllerTest {
                         jsonPath("$.status").value("error"),
                         jsonPath("$.message").value("Room closed")),
                 Arguments.of(
-                        Named.of("unexpected error returns 500",
+                        Named.of("TestShouldReturn500OnUnexpectedError",
                                 (ServiceSetup) s -> doThrow(new RuntimeException("db down"))
                                         .when(s).postMessage("room-1", "userA", "hello there")),
                         "hello there",
@@ -90,19 +90,19 @@ class MessageControllerTest {
     static Stream<Arguments> getMessagesScenarios() {
         return Stream.of(
                 Arguments.of(
-                        Named.of("success - returns messages", (ServiceSetup) s -> when(s.getMessages("room-1"))
+                        Named.of("TestShouldReturnMessagesWhenRoomExists", (ServiceSetup) s -> when(s.getMessages("room-1"))
                                 .thenReturn(List.of(
                                         Map.of("sender", "userA", "message", "hello")))),
                         200,
                         jsonPath("$[0].sender").value("userA")),
                 Arguments.of(
-                        Named.of("room not found returns 404",
+                        Named.of("TestShouldReturn404WhenRoomNotFound",
                                 (ServiceSetup) s -> doThrow(new IllegalArgumentException("Room not found"))
                                         .when(s).getMessages("room-1")),
                         404,
                         jsonPath("$.message").value("Room not found")),
                 Arguments.of(
-                        Named.of("unexpected error returns 500",
+                        Named.of("TestShouldReturn500OnUnexpectedError",
                                 (ServiceSetup) s -> doThrow(new RuntimeException("db down"))
                                         .when(s).getMessages("room-1")),
                         500,

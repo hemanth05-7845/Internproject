@@ -21,7 +21,7 @@ func GetEventStore() *EventStore {
 }
 func NewEventStore() *EventStore {
 	return &EventStore{events: make(map[string][]models.EventFeedItem)}
-}
+} //Especially Testing purpose kaaga
 
 func (es *EventStore) PushEvent(roomID, eventType, description string) {
 	es.mu.Lock()
@@ -30,7 +30,7 @@ func (es *EventStore) PushEvent(roomID, eventType, description string) {
 		RoomID:      roomID,
 		Event:       eventType,
 		Description: description,
-		At:          time.Now().UTC(),
+		CreatedAt:          time.Now().UTC(),
 	}
 	es.events[roomID] = append(es.events[roomID], item)
 	if len(es.events[roomID]) > 50 {
@@ -45,8 +45,7 @@ func (es *EventStore) GetEvents(roomID string) []models.EventFeedItem {
 	if items == nil {
 		return []models.EventFeedItem{}
 	}
-	// Return a copy
-	out := make([]models.EventFeedItem, len(items))
+	out := make([]models.EventFeedItem, len(items)) //if not Copy, then people can change
 	copy(out, items)
 	return out
 }

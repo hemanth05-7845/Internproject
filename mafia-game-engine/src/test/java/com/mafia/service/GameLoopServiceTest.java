@@ -32,7 +32,7 @@ class GameLoopServiceTest {
     GameLoopService service;
 
     @Test
-    void resolveVoting_eliminatesTargetAndAdvancesPhase_whenMajorityVote() {
+    void TestShouldResolveVotingAndEliminatePlayerWithMajorityVotes() {
         GameState gs = votingState("room-1", 2);
         when(gameStateRepository.findByRoomId("room-1")).thenReturn(Optional.of(gs));
         when(voteCountingService.getEliminationTarget("room-1", 2)).thenReturn("targetA");
@@ -46,12 +46,11 @@ class GameLoopServiceTest {
         GameEvent saved = eventCaptor.getValue();
         assertEquals("PLAYER_ELIMINATED", saved.getEventType());
         assertTrue(saved.getDescription().contains("targetA"));
-
         verify(nightPhaseService).advancePhase("room-1");
     }
 
     @Test
-    void resolveVoting_savesTieEventAndAdvancesPhase_whenNoMajority() {
+    void TestShouldSaveTieEventAndAdvancePhaseWhenNoMajority() {
         GameState gs = votingState("room-1", 2);
         when(gameStateRepository.findByRoomId("room-1")).thenReturn(Optional.of(gs));
         when(voteCountingService.getEliminationTarget("room-1", 2)).thenReturn(null);
@@ -70,19 +69,16 @@ class GameLoopServiceTest {
     }
 
     @Test
-    void resolveVoting_alwaysAdvancesPhase_regardlessOfElimination() {
+    void TestShouldAlwaysAdvancePhaseRegardlessOfElimination() {
         GameState gs = votingState("room-1", 1);
         when(gameStateRepository.findByRoomId("room-1")).thenReturn(Optional.of(gs));
         when(voteCountingService.getEliminationTarget("room-1", 1)).thenReturn("targetA");
-
         service.resolveVoting("room-1");
-
-        // advancePhase must be called even when elimination happens
         verify(nightPhaseService).advancePhase("room-1");
     }
 
     @Test
-    void resolveVoting_throwsIllegalArgumentException_whenGameNotFound() {
+    void TestShouldThrowIllegalArgumentExceptionWhenGameNotFound() {
         when(gameStateRepository.findByRoomId("room-1")).thenReturn(Optional.empty());
 
         IllegalArgumentException ex = assertThrows(IllegalArgumentException.class,
@@ -93,7 +89,7 @@ class GameLoopServiceTest {
     }
 
     @Test
-    void resolveVoting_throwsIllegalStateException_whenNotVotingPhase() {
+    void TestShouldThrowIllegalStateExceptionWhenNotInVotingPhase() {
         GameState gs = new GameState("room-1");
         gs.setPhase("NIGHT");
         gs.setDayNumber(1);

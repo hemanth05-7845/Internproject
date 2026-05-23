@@ -1,6 +1,7 @@
 package com.mafia.service;
 
 import com.mafia.dto.response.AggregatedGameSnapshot;
+import com.mafia.client.EventServiceClient;
 import com.mafia.entity.GameEvent;
 import com.mafia.entity.GameState;
 import com.mafia.entity.Player;
@@ -29,24 +30,28 @@ public class GameStateService {
     private final MessageRepository messageRepository;
     private final RoomRepository roomRepository;
     private final WinConditionService winConditionService;
+    private final EventServiceClient eventServiceClient;
 
     public GameStateService(GameStateRepository gameStateRepository,
             PlayerRepository playerRepository,
             GameEventRepository gameEventRepository,
             MessageRepository messageRepository,
             RoomRepository roomRepository,
-            WinConditionService winConditionService) {
+            WinConditionService winConditionService,
+            EventServiceClient eventServiceClient) {
         this.gameStateRepository = gameStateRepository;
         this.playerRepository = playerRepository;
         this.gameEventRepository = gameEventRepository;
         this.messageRepository = messageRepository;
         this.roomRepository = roomRepository;
         this.winConditionService = winConditionService;
+        this.eventServiceClient = eventServiceClient;
     }
 
     public void initializeGameState(String roomId) {
         gameStateRepository.save(new GameState(roomId));
         gameEventRepository.save(new GameEvent(roomId, "GAME_INITIALIZED", "Room created"));
+        eventServiceClient.pushEvent(roomId, "GAME_INITIALIZED", "Room created");
     }
 
     public AggregatedGameSnapshot getSnapshot(String roomId) {
@@ -72,14 +77,17 @@ public class GameStateService {
                         "timestamp", (Object) m.getCreatedAt().toString()))
                 .collect(Collectors.toList());
 
-        List<Map<String, Object>> eventMaps = gameEventRepository
-                .findByRoomIdOrderByCreatedAtDesc(roomId).stream()
-                .limit(20)
-                .map(e -> Map.of(
-                        "type", (Object) e.getEventType(),
-                        "description", (Object) e.getDescription(),
-                        "at", (Object) e.getCreatedAt().toString()))
-                .collect(Collectors.toList());
+        List<Map<String, Object>> eventMaps = eventServiceClient.getEvents(roomId);
+        if (eventMaps.isEmpty()) {
+            eventMaps = gameEventRepository
+                    .findByRoomIdOrderByCreatedAtDesc(roomId).stream()
+                    .limit(20)
+                    .map(e -> Map.<String, Object>of(
+                            "event",       e.getEventType(),
+                            "description", e.getDescription(),
+                            "at",          e.getCreatedAt().toString()))
+                    .collect(Collectors.toList());
+        }
 
         boolean revealNight = isAtOrAfter(gs.getPhase(), "SUNRISE");
         String nightKill = revealNight ? gs.getNightKillTarget() : null;
@@ -88,6 +96,11 @@ public class GameStateService {
                 : null;
         Boolean policeCorrect = revealNight ? gs.getPoliceGuessCorrect() : null;
         Boolean nightKillFailed = revealNight ? gs.getNightKillFailed() : null;
+        
+        int remainingSeconds = eventServiceClient.getTimerRemainingSeconds(roomId);
+        String phaseEndsAt = remainingSeconds > 0
+                ? Instant.now().plusSeconds(remainingSeconds).toString()
+                : null;
 
         return new AggregatedGameSnapshot(
                 gs.getPhase(),
@@ -106,11 +119,13 @@ public class GameStateService {
                 getAvailableActions(gs),
                 room.getRoomCode(),
                 room.getHostUsername(),
-                Instant.now().toString());
+                phaseEndsAt);
     }
 
     public void startGame(String roomId) {
         GameState gs = requireGameState(roomId);
+        Room room = roomRepository.findById(roomId)
+            .orElseThrow(() -> new IllegalArgumentException("Room not found: " + roomId));
         List<Player> players = playerRepository.findByRoomId(roomId);
 
         if (players.size() < MIN_PLAYERS) {
@@ -132,8 +147,15 @@ public class GameStateService {
         gs.setUpdatedAt(LocalDateTime.now());
         gameStateRepository.save(gs);
 
-        gameEventRepository.save(new GameEvent(roomId, "GAME_STARTED",
-                "Game started with " + players.size() + " players"));
+        eventServiceClient.startPhaseTimer(roomId, "NIGHT", 30);
+
+        room.setStatus("IN_GAME");
+        room.setUpdatedAt(LocalDateTime.now());
+        roomRepository.save(room);
+
+        String startMsg = "Game started with " + players.size() + " players";
+        gameEventRepository.save(new GameEvent(roomId, "GAME_STARTED", startMsg));
+        eventServiceClient.pushEvent(roomId, "GAME_STARTED", startMsg);
     }
 
     public GameState requireGameState(String roomId) {

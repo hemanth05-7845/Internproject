@@ -12,6 +12,7 @@ import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -37,7 +38,7 @@ class GameCommandServiceTest {
     GameCommandService service;
 
     @Test
-    void submitVote_savesVote_whenAlivePlayerVotesDuringVotingPhase() {
+    void TestShouldSubmitVoteWhenAlivePlayerVoteinVotingPhase() {
         GameState gs = votingPhaseState("room-1", 2);
         when(gameStateRepository.findByRoomId("room-1")).thenReturn(Optional.of(gs));
         when(voteRepository.existsByRoomIdAndDayNumberAndVoterId("room-1", 2, "voterA")).thenReturn(false);
@@ -45,38 +46,49 @@ class GameCommandServiceTest {
                 .thenReturn(Optional.of(alivePlayer("voterA", "room-1")));
 
         assertDoesNotThrow(() -> service.submitVote("room-1", "voterA", "targetB"));
-
-        verify(voteRepository).save(any(Vote.class));
+        ArgumentCaptor<Vote> voteCaptor = ArgumentCaptor.forClass(Vote.class);
+        verify(voteRepository).save(voteCaptor.capture());
+        Vote saved = voteCaptor.getValue();
+        assertEquals("room-1", saved.getRoomId());
+        assertEquals(2, saved.getDayNumber());
+        assertEquals("voterA", saved.getVoterId());
+        assertEquals("targetB", saved.getVotedFor());
     }
 
     @Test
-    void submitVote_savesVote_whenGhostVoteAllowedOnCurrentDay() {
+    void TestShouldSubmitVoteWhenGhostVotesOnCurrentDay() {
         GameState gs = votingPhaseState("room-1", 3);
         when(gameStateRepository.findByRoomId("room-1")).thenReturn(Optional.of(gs));
         when(voteRepository.existsByRoomIdAndDayNumberAndVoterId("room-1", 3, "voterA")).thenReturn(false);
 
         Player ghost = new Player("voterA", "room-1");
         ghost.setStatus("ELIMINATED");
-        ghost.setVoteEligibleDayNumber(3); // ghost vote allowed on day 3
+        ghost.setVoteEligibleDayNumber(3);
         when(playerRepository.findByUsernameAndRoomId("voterA", "room-1"))
                 .thenReturn(Optional.of(ghost));
 
         assertDoesNotThrow(() -> service.submitVote("room-1", "voterA", "targetB"));
 
-        verify(voteRepository).save(any(Vote.class));
+        ArgumentCaptor<Vote> voteCaptor = ArgumentCaptor.forClass(Vote.class);
+        verify(voteRepository).save(voteCaptor.capture());
+        Vote saved = voteCaptor.getValue();
+        assertEquals("room-1", saved.getRoomId());
+        assertEquals(3, saved.getDayNumber());
+        assertEquals("voterA", saved.getVoterId());
+        assertEquals("targetB", saved.getVotedFor());
     }
 
     static Stream<Arguments> submitVoteExceptionScenarios() {
         return Stream.of(
                 Arguments.of(
-                        Named.of("game not found throws IllegalArgumentException", (TestSetup) s -> {
+                        Named.of("TestShouldThrowExceptionwWhenGameStateisNotFound", (TestSetup) s -> {
                             when(s.gameStateRepository.findByRoomId("room-1"))
                                     .thenReturn(Optional.empty());
                         }),
                         IllegalArgumentException.class,
                         "Game not found"),
                 Arguments.of(
-                        Named.of("wrong phase throws IllegalStateException", (TestSetup) s -> {
+                        Named.of("TestShouldThrowExceptionWhenWrongPhase", (TestSetup) s -> {
                             GameState gs = new GameState("room-1");
                             gs.setPhase("DAY_DISCUSSION");
                             gs.setDayNumber(1);
@@ -86,7 +98,7 @@ class GameCommandServiceTest {
                         IllegalStateException.class,
                         "Voting phase not active"),
                 Arguments.of(
-                        Named.of("duplicate vote throws IllegalStateException", (TestSetup) s -> {
+                        Named.of("TestShouldThrowExceptionForDuplicateVote", (TestSetup) s -> {
                             GameState gs = votingPhaseState("room-1", 2);
                             when(s.gameStateRepository.findByRoomId("room-1"))
                                     .thenReturn(Optional.of(gs));
@@ -96,7 +108,7 @@ class GameCommandServiceTest {
                         IllegalStateException.class,
                         "Vote already submitted for this round"),
                 Arguments.of(
-                        Named.of("voter not found throws IllegalArgumentException", (TestSetup) s -> {
+                        Named.of("TestShouldThrowExceptionWhenVoterNotFound", (TestSetup) s -> {
                             GameState gs = votingPhaseState("room-1", 2);
                             when(s.gameStateRepository.findByRoomId("room-1"))
                                     .thenReturn(Optional.of(gs));
@@ -108,7 +120,7 @@ class GameCommandServiceTest {
                         IllegalArgumentException.class,
                         "Player not found: voterA"),
                 Arguments.of(
-                        Named.of("dead player without ghost vote throws IllegalStateException", (TestSetup) s -> {
+                        Named.of("TestShouldThrowExceptionForDeadPlayerWithoutGhostVote", (TestSetup) s -> {
                             GameState gs = votingPhaseState("room-1", 2);
                             when(s.gameStateRepository.findByRoomId("room-1"))
                                     .thenReturn(Optional.of(gs));
@@ -126,7 +138,7 @@ class GameCommandServiceTest {
 
     @ParameterizedTest
     @MethodSource("submitVoteExceptionScenarios")
-    void submitVote_throwsException(TestSetup setup, Class<? extends Exception> expectedException,
+    void TestShouldThrowExceptionWhenInvalidVoteIsSubmitted(TestSetup setup, Class<? extends Exception> expectedException,
             String expectedMessage) {
         setup.configure(this);
 

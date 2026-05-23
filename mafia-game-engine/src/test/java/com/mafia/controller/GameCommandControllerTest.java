@@ -35,24 +35,24 @@ class GameCommandControllerTest {
     static Stream<Arguments> submitVoteScenarios() {
         return Stream.of(
                 Arguments.of(
-                        Named.of("success",
+                        Named.of("TestShouldRecordVoteSuccessfullyWithValidInput",
                                 (ServiceSetup) s -> doNothing().when(s).submitVote("room-1", "voterA", "targetB")),
                         200,
                         jsonPath("$.status").value("vote-recorded")),
                 Arguments.of(
-                        Named.of("game not found",
+                        Named.of("TestShouldReturn400WhenGameNotFound",
                                 (ServiceSetup) s -> doThrow(new IllegalArgumentException("Game not found"))
                                         .when(s).submitVote("room-1", "voterA", "targetB")),
                         400,
                         jsonPath("$.message").value("Game not found")),
                 Arguments.of(
-                        Named.of("voting phase not active",
+                        Named.of("TestShouldReturn400WhenVotingPhaseNotActive",
                                 (ServiceSetup) s -> doThrow(new IllegalStateException("Voting phase not active"))
                                         .when(s).submitVote("room-1", "voterA", "targetB")),
                         400,
                         jsonPath("$.message").value("Voting phase not active")),
                 Arguments.of(
-                        Named.of("unexpected error returns 500",
+                        Named.of("TestShouldReturn500OnUnexpectedError",
                                 (ServiceSetup) s -> doThrow(new RuntimeException("db down"))
                                         .when(s).submitVote("room-1", "voterA", "targetB")),
                         500,

@@ -51,11 +51,11 @@ class RoomServiceTest {
     class CreateRoom {
 
         @Test
-        @DisplayName("saves room, host player, and initializes game state")
-        void createRoom_happyPath() {
+        @DisplayName("TestShouldCreateRoomWithUniqueCodeAndInitializeGameState")
+        void createRoom() {
             when(roomRepository.findByRoomCode(anyString())).thenReturn(Optional.empty());
             Room saved = activeRoom("room-1", 12, "alice");
-            when(roomRepository.save(any(Room.class))).thenReturn(saved);
+            when(roomRepository.save(argThat(r -> "Test Room".equals(r.getName()) && "alice".equals(r.getHostUsername())))).thenReturn(saved);
 
             Room result = roomService.createRoom("Test Room", "alice");
             ArgumentCaptor<Room> roomCaptor = ArgumentCaptor.forClass(Room.class);

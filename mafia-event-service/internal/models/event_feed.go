@@ -6,7 +6,7 @@ type EventFeedItem struct {
 	RoomID      string    `json:"roomId"`
 	Event       string    `json:"event"`
 	Description string    `json:"description"`
-	At          time.Time `json:"at"`
+	CreatedAt          time.Time `json:"at"`
 }
 type PhaseTransitionEvent struct {
 	RoomID    string    `json:"roomId"`

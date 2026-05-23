@@ -17,13 +17,13 @@ func TestBuildTimerSnapshotFromManager(t *testing.T) {
 		expectedRemaining int
 	}{
 		{
-			name:              "no timer",
+			name:              "TestShouldReturnDefaultValuesWhenNoActiveTimer",
 			expectedRoomID:    "room1",
 			expectedPhase:     "LOBBY",
 			expectedRemaining: 0,
 		},
 		{
-			name:             "with active timer",
+			name:             "TestShouldReturnActiveTimerValuesWhenTimerIsRunning",
 			setupTimer:       true,
 			phase:            "NIGHT",
 			minRemainingTime: 1,
@@ -45,7 +45,7 @@ func TestBuildTimerSnapshotFromManager(t *testing.T) {
 			} else {
 				assert.Equal(t, tt.expectedRemaining, snap.RemainingTime)
 			}
-			assert.WithinDuration(t, time.Now().UTC(), snap.UpdatedAt, time.Second)
+			assert.WithinDuration(t, time.Now().UTC(), snap.UpdatedAt, time.Second)//future la edhadhu irukka nu check panrathu
 		})
 	}
 }
@@ -58,25 +58,25 @@ func TestBuildEventFeed(t *testing.T) {
 		expectedMessage string
 	}{
 		{
-			name:          "empty",
+			name:          "TestShouldReturnEmptyEventFeedWhenNoEventsExist",
 			expectedCount: 0,
 		},
 		{
-			name:            "with events",
+			name:            "TestShouldReturnEventFeedWithOneEvent",
 			seedEvents:      true,
 			expectedCount:   1,
 			expectedType:    "VOTE",
-			expectedMessage: "player1 voted",
+			expectedMessage: "Yaaro vote pannirukanga",
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			es := NewEventStore()
 			if tt.seedEvents {
-				es.PushEvent("room1", "VOTE", "player1 voted")
+				es.PushEvent("room1", "VOTE", "Yaaro vote pannirukanga")
 			}
 			feed := BuildEventFeed("room1", es)
-			assert.NotNil(t, feed)
+			assert.NotNil(t, feed) //Empty but not nil
 			assert.Len(t, feed, tt.expectedCount)
 			if tt.expectedCount > 0 {
 				assert.Equal(t, tt.expectedType, feed[0].Event)

@@ -2,6 +2,8 @@ import asyncio
 import logging
 import os
 
+import httpx
+
 from fastapi import (
     APIRouter,
     Depends,
@@ -58,7 +60,7 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
-SECRET = os.getenv("JWT_SECRET", "dev-secret")
+SECRET = os.getenv("JWT_SECRET")
 ALGORITHM = os.getenv("JWT_ALGORITHM", "HS256")
 EXPIRES_MINUTES = int(os.getenv("JWT_EXPIRES_MINUTES", "480"))
 WS_POLL_INTERVAL = 1.5
@@ -76,7 +78,6 @@ def get_current_user(authorization: str = Header(default="")) -> str:
 
 
 def _room_response(room: dict) -> RoomResponse:
-    """Single place that maps a Spring room dict → RoomResponse."""
     return RoomResponse(
         room_id=room["roomId"],
         room_code=room["roomCode"],
@@ -89,13 +90,13 @@ def _room_response(room: dict) -> RoomResponse:
 
 
 def _build_snapshot(snap: dict, username: str) -> dict:
-    """Convert camelCase Spring snapshot → snake_case personalised dict."""
     game_over = snap.get("phase") == "GAME_OVER"
     current_day = snap.get("dayNumber", 0)
 
     players = []
     my_role = None
     my_player = None
+    mafia_members = []
 
     for p in snap.get("players", []):
         role = p.get("role")
@@ -110,6 +111,8 @@ def _build_snapshot(snap: dict, username: str) -> dict:
                 "role": role if (game_over or is_me) else None,
             }
         )
+        if role == "MAFIA":
+            mafia_members.append(p.get("name"))
 
     is_alive = bool(my_player and my_player.get("alive", False))
     vote_eligible_day = my_player.get("voteEligibleDayNumber") if my_player else None
@@ -134,6 +137,7 @@ def _build_snapshot(snap: dict, username: str) -> dict:
         "room_code": snap.get("roomCode", ""),
         "host_username": snap.get("hostUsername", ""),
         "my_role": my_role,
+        "mafia_members": mafia_members if my_role == "MAFIA" else [],
     }
 
 
@@ -144,10 +148,6 @@ def health() -> dict:
 
 @router.post("/auth/join", response_model=TokenResponse)
 def join(payload: JoinRequest) -> TokenResponse:
-    """
-    Name-only session: player sends their chosen display name,
-    gets back a JWT. No password required.
-    """
     register_session(payload.username)
     token = create_access_token(
         subject=payload.username,
@@ -240,6 +240,16 @@ async def start_game_endpoint(
 
     try:
         await engine_start_game(payload.room_id)
+    except httpx.HTTPStatusError as exc:
+        logger.exception("Failed to start game room_id=%s", payload.room_id)
+        msg = "Failed to start game"
+        try:
+            data = exc.response.json()
+            msg = data.get("message") or data.get("detail") or msg
+        except Exception:
+            if exc.response.text:
+                msg = exc.response.text
+        raise HTTPException(status_code=exc.response.status_code, detail=msg) from exc
     except Exception as exc:
         logger.exception("Failed to start game room_id=%s", payload.room_id)
         raise HTTPException(
@@ -268,12 +278,14 @@ async def game_state(
     try:
         timer = await gin_get_timer(room_id)
         snapshot["phase_ends_at"] = timer.get("updatedAt", "")
+        snapshot["remaining_seconds"] = timer.get("remainingSeconds", 0)
     except Exception:
         logger.warning(
             "Timer service unavailable for room_id=%s, defaulting phase_ends_at to empty",
             room_id,
         )
         snapshot["phase_ends_at"] = ""
+        snapshot["remaining_seconds"] = 0
 
     return GameSnapshot(**snapshot)
 
@@ -402,6 +414,13 @@ async def game_websocket(websocket: WebSocket, room_id: str, token: str = "") ->
             try:
                 raw = await engine_get_game_state(room_id)
                 snapshot = _build_snapshot(raw, username)
+                try:
+                    timer = await gin_get_timer(room_id)
+                    snapshot["phase_ends_at"] = timer.get("updatedAt", "")
+                    snapshot["remaining_seconds"] = timer.get("remainingSeconds", 0)
+                except Exception:
+                    snapshot["phase_ends_at"] = ""
+                    snapshot["remaining_seconds"] = 0
                 await websocket.send_json(snapshot)
             except WebSocketDisconnect:
                 return

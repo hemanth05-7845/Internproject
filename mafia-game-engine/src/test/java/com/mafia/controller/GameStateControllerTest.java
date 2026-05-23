@@ -31,7 +31,7 @@ class GameStateControllerTest {
     private GameStateService gameStateService;
 
     @Test
-    void health_returnsOk() throws Exception {
+    void TestShouldReturnOKWhenPinged() throws Exception {
         mockMvc.perform(get("/api/health"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.status").value("ok"))
@@ -42,7 +42,7 @@ class GameStateControllerTest {
     static Stream<Arguments> gameStateScenarios() {
         return Stream.of(
                 Arguments.of(
-                        Named.of("success - returns snapshot", (ServiceSetup) s -> {
+                        Named.of("TestShouldReturn200WhenGameStateRetrievedSuccessfully", (ServiceSetup) s -> {
                             AggregatedGameSnapshot snap = new AggregatedGameSnapshot(
                                     "DAY_DISCUSSION", 1, 1, List.of(), List.of(),
                                     List.of(), null, null, null, null,
@@ -53,13 +53,13 @@ class GameStateControllerTest {
                         200,
                         jsonPath("$.phase").value("DAY_DISCUSSION")),
                 Arguments.of(
-                        Named.of("room not found returns 404",
+                        Named.of("TestShouldReturn404WhenRoomNotFound",
                                 (ServiceSetup) s -> doThrow(new IllegalArgumentException("Room not found"))
                                         .when(s).getSnapshot("room-1")),
                         404,
                         jsonPath("$.message").value("Room not found")),
                 Arguments.of(
-                        Named.of("unexpected error returns 500",
+                        Named.of("TestShouldReturn500OnUnexpectedError",
                                 (ServiceSetup) s -> doThrow(new RuntimeException("db down"))
                                         .when(s).getSnapshot("room-1")),
                         500,
@@ -81,23 +81,23 @@ class GameStateControllerTest {
     static Stream<Arguments> startGameScenarios() {
         return Stream.of(
                 Arguments.of(
-                        Named.of("success", (ServiceSetup) s -> doNothing().when(s).startGame("room-1")),
+                        Named.of("TestShouldReturn200WhenGameStartedSuccessfully", (ServiceSetup) s -> doNothing().when(s).startGame("room-1")),
                         200,
                         jsonPath("$.status").value("started")),
                 Arguments.of(
-                        Named.of("not enough players returns 400",
+                        Named.of("TestShouldReturn400WhenNotEnoughPlayers",
                                 (ServiceSetup) s -> doThrow(new IllegalStateException("Need at least 6 players"))
                                         .when(s).startGame("room-1")),
                         400,
                         jsonPath("$.message").value("Need at least 6 players")),
                 Arguments.of(
-                        Named.of("illegal argument returns 400",
+                        Named.of("TestShouldReturn400WhenIllegalArgumentProvided",
                                 (ServiceSetup) s -> doThrow(new IllegalArgumentException("Room not found"))
                                         .when(s).startGame("room-1")),
                         400,
                         jsonPath("$.message").value("Room not found")),
                 Arguments.of(
-                        Named.of("unexpected error returns 500",
+                        Named.of("TestShouldReturn500OnUnexpectedError",
                                 (ServiceSetup) s -> doThrow(new RuntimeException("crash"))
                                         .when(s).startGame("room-1")),
                         500,
@@ -118,10 +118,6 @@ class GameStateControllerTest {
 
     @FunctionalInterface
     interface ServiceSetup {
-        void apply(GameStateService s);
-
-        default void configure(GameStateService s) {
-            apply(s);
+        void configure(GameStateService service);
         }
-    }
 }

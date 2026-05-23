@@ -1,5 +1,6 @@
 package com.mafia.service;
 
+import com.mafia.client.EventServiceClient;
 import com.mafia.entity.GameEvent;
 import com.mafia.entity.GameState;
 import com.mafia.repository.GameEventRepository;
@@ -13,15 +14,18 @@ public class GameLoopService {
     private final VoteCountingService voteCountingService;
     private final GameStateRepository gameStateRepository;
     private final GameEventRepository gameEventRepository;
+    private final EventServiceClient eventServiceClient;
 
     public GameLoopService(NightPhaseService nightPhaseService,
             VoteCountingService voteCountingService,
             GameStateRepository gameStateRepository,
-            GameEventRepository gameEventRepository) {
+            GameEventRepository gameEventRepository,
+            EventServiceClient eventServiceClient) {
         this.nightPhaseService = nightPhaseService;
         this.voteCountingService = voteCountingService;
         this.gameStateRepository = gameStateRepository;
         this.gameEventRepository = gameEventRepository;
+        this.eventServiceClient = eventServiceClient;
     }
 
     public void resolveVoting(String roomId) {
@@ -35,11 +39,13 @@ public class GameLoopService {
         String target = voteCountingService.getEliminationTarget(roomId, gs.getDayNumber());
         if (target != null) {
             voteCountingService.applyElimination(roomId, target);
-            gameEventRepository.save(new GameEvent(roomId, "PLAYER_ELIMINATED",
-                    target + " was eliminated by village vote"));
+            String elimMsg = target + " was eliminated by village vote";
+            gameEventRepository.save(new GameEvent(roomId, "PLAYER_ELIMINATED", elimMsg));
+            eventServiceClient.pushEvent(roomId, "PLAYER_ELIMINATED", elimMsg);
         } else {
-            gameEventRepository.save(new GameEvent(roomId, "VOTING_COMPLETE",
-                    "Voting ended in a tie — no one was eliminated"));
+            String tieMsg = "Voting ended in a tie — no one was eliminated";
+            gameEventRepository.save(new GameEvent(roomId, "VOTING_COMPLETE", tieMsg));
+            eventServiceClient.pushEvent(roomId, "VOTING_COMPLETE", tieMsg);
         }
 
         nightPhaseService.advancePhase(roomId);

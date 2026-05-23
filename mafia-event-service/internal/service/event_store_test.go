@@ -15,7 +15,7 @@ func TestEventStore(t *testing.T) {
 		assert func(*testing.T, *EventStore)
 	}{
 		{
-			name: "adds event",
+			name: "TestShouldAddEventtoEventStoreWithValidInput",
 			setup: func(es *EventStore) {
 				es.PushEvent("room1", "VOTE", "player1 voted")
 			},
@@ -25,11 +25,11 @@ func TestEventStore(t *testing.T) {
 				assert.Equal(t, "VOTE", feed[0].Event)
 				assert.Equal(t, "player1 voted", feed[0].Description)
 				assert.Equal(t, "room1", feed[0].RoomID)
-				assert.WithinDuration(t, time.Now().UTC(), feed[0].At, time.Second)
+				assert.WithinDuration(t, time.Now().UTC(), feed[0].CreatedAt, time.Second)
 			},
 		},
 		{
-			name: "empty room",
+			name: "TestShouldReturnEmptyEventFeedWhenNoEventsExist",
 			assert: func(t *testing.T, es *EventStore) {
 				feed := es.GetEvents("room1")
 				assert.NotNil(t, feed)
@@ -37,7 +37,7 @@ func TestEventStore(t *testing.T) {
 			},
 		},
 		{
-			name: "returns copy",
+			name: "TestShouldReturnCopyOfEventsandNotOriginalReference",
 			setup: func(es *EventStore) {
 				es.PushEvent("room1", "VOTE", "player1 voted")
 			},
@@ -49,7 +49,7 @@ func TestEventStore(t *testing.T) {
 			},
 		},
 		{
-			name: "cap at 50",
+			name: "TestShouldCapEventFeedAt50Items",
 			setup: func(es *EventStore) {
 				for i := 0; i < 55; i++ {
 					es.PushEvent("room1", "VOTE", "event")
@@ -61,7 +61,7 @@ func TestEventStore(t *testing.T) {
 			},
 		},
 		{
-			name: "keeps newest 50",
+			name: "TestShouldKeepNewest50Events",
 			setup: func(es *EventStore) {
 				for i := 0; i < 55; i++ {
 					es.PushEvent("room1", "VOTE", fmt.Sprintf("event-%d", i))
@@ -71,10 +71,11 @@ func TestEventStore(t *testing.T) {
 				feed := es.GetEvents("room1")
 				assert.Equal(t, "event-5", feed[0].Description)
 				assert.Equal(t, "event-54", feed[len(feed)-1].Description)
+				assert.Len(t, feed, 50)
 			},
 		},
 		{
-			name: "isolated by room",
+			name: "TestShouldIsolateEventsByRoomProvidedValideRoomID",
 			setup: func(es *EventStore) {
 				es.PushEvent("room1", "VOTE", "room1 event")
 				es.PushEvent("room2", "CHAT", "room2 event")

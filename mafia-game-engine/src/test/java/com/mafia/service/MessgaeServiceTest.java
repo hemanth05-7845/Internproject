@@ -10,6 +10,7 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.util.Assert;
 
 import java.time.LocalDateTime;
 import java.util.List;
@@ -32,7 +33,7 @@ class MessageServiceTest {
     MessageService service;
 
     @Test
-    void postMessage_savesMessageAndReturnsMap_whenAlivePlayer() {
+    void TestShouldSaveMessageAndReturnMapWhenAlivePlayer() {
         when(playerRepository.findByUsernameAndRoomId("userA", "room-1"))
                 .thenReturn(Optional.of(alivePlayer("userA", "room-1")));
 
@@ -48,7 +49,7 @@ class MessageServiceTest {
     }
 
     @Test
-    void postMessage_trimsContentTo300Chars_whenOver300() {
+    void TestShouldTrimContentTo300CharsWhenOver300() {
         when(playerRepository.findByUsernameAndRoomId("userA", "room-1"))
                 .thenReturn(Optional.of(alivePlayer("userA", "room-1")));
 
@@ -59,10 +60,11 @@ class MessageServiceTest {
         verify(messageRepository).save(captor.capture());
 
         assertNotNull(captor.getValue().getContent());
+        assertEquals(300, captor.getValue().getContent().length());
     }
 
     @Test
-    void postMessage_throwsIllegalArgumentException_whenContentIsNull() {
+    void TestShouldThrowIllegalArgumentExceptionWhenContentIsNull() {
         IllegalArgumentException ex = assertThrows(IllegalArgumentException.class,
                 () -> service.postMessage("room-1", "userA", null));
 
@@ -71,7 +73,7 @@ class MessageServiceTest {
     }
 
     @Test
-    void postMessage_throwsIllegalArgumentException_whenContentIsBlank() {
+    void TestShouldThrowIllegalArgumentExceptionWhenContentIsBlank() {
         IllegalArgumentException ex = assertThrows(IllegalArgumentException.class,
                 () -> service.postMessage("room-1", "userA", "   "));
 
@@ -80,7 +82,7 @@ class MessageServiceTest {
     }
 
     @Test
-    void postMessage_throwsIllegalStateException_whenPlayerIsDead() {
+    void TestShouldThrowIllegalStateExceptionWhenPlayerIsDead() {
         Player dead = new Player("userA", "room-1");
         dead.setStatus("ELIMINATED");
         when(playerRepository.findByUsernameAndRoomId("userA", "room-1"))
@@ -94,7 +96,7 @@ class MessageServiceTest {
     }
 
     @Test
-    void postMessage_throwsIllegalStateException_whenPlayerNotFound() {
+    void TestShouldThrowIllegalStateExceptionWhenPlayerNotFound() {
         when(playerRepository.findByUsernameAndRoomId("userA", "room-1"))
                 .thenReturn(Optional.empty());
 
@@ -106,7 +108,7 @@ class MessageServiceTest {
     }
 
     @Test
-    void getMessages_returnsMappedMessages_orderedByRepo() {
+    void TestShouldReturnMappedMessagesOrderedByRepo() {
         Message m1 = testMessage("room-1", "userA", "hello");
         Message m2 = testMessage("room-1", "userB", "world");
         when(messageRepository.findByRoomIdOrderByCreatedAtDesc("room-1"))
@@ -122,7 +124,7 @@ class MessageServiceTest {
     }
 
     @Test
-    void getMessages_limitsTo50() {
+    void TestShouldLimitMessagesTo50() {
         List<Message> messages = java.util.stream.IntStream.range(0, 55)
                 .mapToObj(i -> testMessage("room-1", "user" + i, "msg" + i))
                 .toList();
@@ -135,7 +137,7 @@ class MessageServiceTest {
     }
 
     @Test
-    void getMessages_returnsEmpty_whenNoMessages() {
+    void TestShouldReturnEmptyListWhenNoMessages() {
         when(messageRepository.findByRoomIdOrderByCreatedAtDesc("room-1"))
                 .thenReturn(List.of());
 

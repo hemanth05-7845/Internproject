@@ -42,17 +42,17 @@ class GamePhaseControllerTest {
     static Stream<Arguments> advancePhaseScenarios() {
         return Stream.of(
                 Arguments.of(
-                        Named.of("success", (ServiceSetup) s -> doNothing().when(s.night).advancePhase("room-1")),
+                        Named.of("TestShouldReturnSucessWhenProvidedWithValidInput", (ServiceSetup) s -> doNothing().when(s.night).advancePhase("room-1")),
                         200,
                         jsonPath("$.status").value("phase-advanced")),
                 Arguments.of(
-                        Named.of("illegal state returns 400",
+                        Named.of("TestShouldReturn400WhenIllegalState",
                                 (ServiceSetup) s -> doThrow(new IllegalStateException("No room state"))
                                         .when(s.night).advancePhase("room-1")),
                         400,
                         jsonPath("$.message").value("No room state")),
                 Arguments.of(
-                        Named.of("unexpected error returns 500",
+                        Named.of("TestShouldReturn500OnUnexpectedError",
                                 (ServiceSetup) s -> doThrow(new RuntimeException("db down"))
                                         .when(s.night).advancePhase("room-1")),
                         500,
@@ -74,20 +74,21 @@ class GamePhaseControllerTest {
     static Stream<Arguments> submitNightKillScenarios() {
         return Stream.of(
                 Arguments.of(
-                        Named.of("success",
+                        Named.of("TestShouldReturn200WhenNightKillSubmittedSuccessfully",
                                 (ServiceSetup) s -> doNothing().when(s.night).submitNightKill("room-1", "targetA")),
                         200,
                         jsonPath("$.status").value("recorded"),
                         jsonPath("$.target").value("targetA")),
                 Arguments.of(
-                        Named.of("not night phase returns 400",
+                        Named.of("TestShouldReturn400WhenNotNightPhase",
+
                                 (ServiceSetup) s -> doThrow(new IllegalStateException("Not night phase"))
                                         .when(s.night).submitNightKill("room-1", "targetA")),
                         400,
                         jsonPath("$.message").value("Not night phase"),
                         jsonPath("$.status").value("error")),
                 Arguments.of(
-                        Named.of("unexpected error returns 500",
+                        Named.of("TestShouldReturn500OnUnexpectedError",
                                 (ServiceSetup) s -> doThrow(new RuntimeException("crash"))
                                         .when(s.night).submitNightKill("room-1", "targetA")),
                         500,
@@ -113,20 +114,20 @@ class GamePhaseControllerTest {
     static Stream<Arguments> submitPoliceGuessScenarios() {
         return Stream.of(
                 Arguments.of(
-                        Named.of("success",
+                        Named.of("TestShouldReturn200WhenPoliceGuessSubmittedSuccessfully",
                                 (ServiceSetup) s -> doNothing().when(s.night).submitPoliceGuess("room-1", "suspectB")),
                         200,
                         jsonPath("$.status").value("recorded"),
                         jsonPath("$.suspect").value("suspectB")),
                 Arguments.of(
-                        Named.of("wrong phase returns 400",
+                        Named.of("TestShouldReturn400WhenWrongPhase",
                                 (ServiceSetup) s -> doThrow(new IllegalStateException("Wrong phase"))
                                         .when(s.night).submitPoliceGuess("room-1", "suspectB")),
                         400,
                         jsonPath("$.message").value("Wrong phase"),
                         jsonPath("$.status").value("error")),
                 Arguments.of(
-                        Named.of("unexpected error returns 500",
+                        Named.of("TestShouldReturn500OnUnexpectedError",
                                 (ServiceSetup) s -> doThrow(new RuntimeException("crash"))
                                         .when(s.night).submitPoliceGuess("room-1", "suspectB")),
                         500,
@@ -152,20 +153,20 @@ class GamePhaseControllerTest {
     static Stream<Arguments> submitDoctorSaveScenarios() {
         return Stream.of(
                 Arguments.of(
-                        Named.of("success",
+                        Named.of("TestShouldReturn200WhenDoctorSaveSubmittedSuccessfully",
                                 (ServiceSetup) s -> doNothing().when(s.night).submitDoctorSave("room-1", "savedC")),
                         200,
                         jsonPath("$.status").value("recorded"),
                         jsonPath("$.saved").value("savedC")),
                 Arguments.of(
-                        Named.of("wrong phase returns 400",
+                        Named.of("TestShouldReturn400WhenNotNightPhase",
                                 (ServiceSetup) s -> doThrow(new IllegalStateException("Not night phase"))
                                         .when(s.night).submitDoctorSave("room-1", "savedC")),
                         400,
                         jsonPath("$.message").value("Not night phase"),
                         jsonPath("$.status").value("error")),
                 Arguments.of(
-                        Named.of("unexpected error returns 500",
+                        Named.of("TestShouldReturn500OnUnexpectedError",
                                 (ServiceSetup) s -> doThrow(new RuntimeException("crash"))
                                         .when(s.night).submitDoctorSave("room-1", "savedC")),
                         500,
@@ -191,17 +192,17 @@ class GamePhaseControllerTest {
     static Stream<Arguments> resolveVotingScenarios() {
         return Stream.of(
                 Arguments.of(
-                        Named.of("success", (ServiceSetup) s -> doNothing().when(s.loop).resolveVoting("room-1")),
+                        Named.of("TestShouldReturn200WhenVotingResolvedSuccessfully", (ServiceSetup) s -> doNothing().when(s.loop).resolveVoting("room-1")),
                         200,
                         jsonPath("$.status").value("voting-resolved")),
                 Arguments.of(
-                        Named.of("no votes returns 400",
+                        Named.of("TestShouldReturn400WhenNoVotesToResolve",
                                 (ServiceSetup) s -> doThrow(new IllegalStateException("No votes to resolve"))
                                         .when(s.loop).resolveVoting("room-1")),
                         400,
                         jsonPath("$.message").value("No votes to resolve")),
                 Arguments.of(
-                        Named.of("unexpected error returns 500",
+                        Named.of("TestShouldReturn500OnUnexpectedError",
                                 (ServiceSetup) s -> doThrow(new RuntimeException("crash"))
                                         .when(s.loop).resolveVoting("room-1")),
                         500,

@@ -45,6 +45,15 @@ export default function LobbyPage({ roomId, roomCode, hostUsername, onEnterGame 
     }
   }, [canStart, token, roomId, onEnterGame]);
 
+  const handleLeaveRoom = useCallback(() => {
+    localStorage.removeItem("mafia_room_id");
+    localStorage.removeItem("mafia_room_code");
+    localStorage.removeItem("mafia_host_username");
+    localStorage.removeItem("mafia_token");
+    localStorage.removeItem("mafia_username");
+    window.location.reload();
+  }, []);
+
   return (
     <div className="lobby-page">
       <div className="lobby-layout fade-up">
@@ -101,6 +110,11 @@ export default function LobbyPage({ roomId, roomCode, hostUsername, onEnterGame 
               Waiting for <strong>{hostUsername}</strong> to start
             </div>
           )}
+
+          <button id="btn-leave-room" className="btn btn-secondary btn-full"
+            onClick={handleLeaveRoom}>
+            Leave Room
+          </button>
         </div>
       </div>
     </div>

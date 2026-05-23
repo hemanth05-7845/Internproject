@@ -4,6 +4,7 @@ import (
 	"testing"
 	"time"
 
+	"fmt"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -16,7 +17,7 @@ func TestTimerManager(t *testing.T) {
 		cleanup func(*TimerManager)
 	}{
 		{
-			name: "start timer initial state",
+			name: "TestShouldStartTimerSuccessfullyWithValidInput",
 			setup: func(tm *TimerManager) {
 				tm.StartTimer("room1", "VOTING", 5)
 			},
@@ -30,7 +31,7 @@ func TestTimerManager(t *testing.T) {
 			cleanup: func(tm *TimerManager) { tm.StopTimer("room1") },
 		},
 		{
-			name: "start timer replaces existing",
+			name: "TestShouldOverrideExistingTimerWhenStartingNewTimerInSameRoom",
 			setup: func(tm *TimerManager) {
 				tm.StartTimer("room1", "DAY", 30)
 				tm.StartTimer("room1", "NIGHT", 60)
@@ -38,26 +39,28 @@ func TestTimerManager(t *testing.T) {
 			assert: func(t *testing.T, tm *TimerManager) {
 				timer := tm.GetTimer("room1")
 				require.NotNil(t, timer)
+				assert.Equal(t,"room1", timer.RoomID)
 				assert.Equal(t, "NIGHT", timer.CurrentPhase)
 				assert.Equal(t, 60, timer.RemainingTime)
 			},
 			cleanup: func(tm *TimerManager) { tm.StopTimer("room1") },
 		},
 		{
-			name: "start timer ticks",
+			name: "TestShouldDecreaseRemainingTimeAfterSleep",
 			setup: func(tm *TimerManager) {
 				tm.StartTimer("room1", "VOTING", 10)
-				time.Sleep(1500 * time.Millisecond)
+				time.Sleep(2000 * time.Millisecond)
 			},
 			assert: func(t *testing.T, tm *TimerManager) {
 				timer := tm.GetTimer("room1")
 				require.NotNil(t, timer)
+				fmt.Println(timer.RemainingTime)
 				assert.Less(t, timer.RemainingTime, 10, "remaining time should have decreased")
 			},
 			cleanup: func(tm *TimerManager) { tm.StopTimer("room1") },
 		},
 		{
-			name: "start timer expires naturally",
+			name: "TestshouldRemoveTimerAfterExpiration",
 			setup: func(tm *TimerManager) {
 				tm.StartTimer("room1", "VOTING", 2)
 				time.Sleep(2500 * time.Millisecond)
@@ -65,9 +68,10 @@ func TestTimerManager(t *testing.T) {
 			assert: func(t *testing.T, tm *TimerManager) {
 				assert.Nil(t, tm.GetTimer("room1"), "expired timer should be removed from map")
 			},
+			cleanup: func(tm *TimerManager) { tm.StopTimer("room1") },
 		},
 		{
-			name: "stop timer removes timer",
+			name: "TestShouldStopTimerSuccessfully",
 			setup: func(tm *TimerManager) {
 				tm.StartTimer("room1", "VOTING", 30)
 				tm.StopTimer("room1")
@@ -75,21 +79,24 @@ func TestTimerManager(t *testing.T) {
 			assert: func(t *testing.T, tm *TimerManager) {
 				assert.Nil(t, tm.GetTimer("room1"))
 			},
+			cleanup: func(tm *TimerManager) { tm.StopTimer("room1") },
 		},
 		{
-			name: "stop timer unknown room",
+			name: "TestShouldHandleStopTimerForUnknownRoom",
 			assert: func(t *testing.T, tm *TimerManager) {
 				assert.NotPanics(t, func() { tm.StopTimer("unknown-room") })
 			},
+			cleanup: func(tm *TimerManager) { tm.StopTimer("unknown-room") },
 		},
 		{
-			name: "get timer unknown room",
+			name: "TestShouldReturnNilForUnknownRoom",
 			assert: func(t *testing.T, tm *TimerManager) {
 				assert.Nil(t, tm.GetTimer("unknown-room"))
 			},
+			cleanup: func(tm *TimerManager) { tm.StopTimer("unknown-room") },
 		},
 		{
-			name: "multiple rooms isolated",
+			name: "TestShouldIsolateTimersByRoom",
 			setup: func(tm *TimerManager) {
 				tm.StartTimer("room1", "DAY", 30)
 				tm.StartTimer("room2", "NIGHT", 60)
@@ -113,9 +120,9 @@ func TestTimerManager(t *testing.T) {
 			if tt.assert != nil {
 				tt.assert(t, tm)
 			}
-			if tt.cleanup != nil {
+			
 				tt.cleanup(tm)
-			}
+			
 		})
 	}
 }

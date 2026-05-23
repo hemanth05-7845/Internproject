@@ -58,6 +58,10 @@ func (ptc *PhaseTransitionController) TransitionPhase(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
+	if ptc.timerManager.GetTimer(roomID) == nil {
+    c.JSON(http.StatusBadRequest, gin.H{"error": "no active timer to transition"})
+    return
+	}
 	ptc.timerManager.StopTimer(roomID)
 	log.Printf("TransitionPhase transition room=%s nextPhase=%s", roomID, req.NextPhase)
 	c.JSON(http.StatusOK, models.PhaseTransitionEvent{
@@ -85,7 +89,12 @@ func (ptc *PhaseTransitionController) GetPhaseStatus(c *gin.Context) {
 
 func (ptc *PhaseTransitionController) CancelPhaseTimer(c *gin.Context) {
 	roomID := c.Param("roomId")
+	if ptc.timerManager.GetTimer(roomID) == nil {
+    c.JSON(http.StatusBadRequest, gin.H{"error": "no active timer to transition"})
+    return
+	}
 	ptc.timerManager.StopTimer(roomID)
+	
 	log.Printf("CancelPhaseTimer timer cancelled room=%s", roomID)
 	c.JSON(http.StatusOK, gin.H{
 		"roomId":  roomID,

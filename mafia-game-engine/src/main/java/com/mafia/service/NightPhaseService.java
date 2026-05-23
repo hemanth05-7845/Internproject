@@ -3,6 +3,7 @@ package com.mafia.service;
 import com.mafia.entity.GameEvent;
 import com.mafia.entity.GameState;
 import com.mafia.entity.Player;
+import com.mafia.client.EventServiceClient;
 import com.mafia.repository.GameEventRepository;
 import com.mafia.repository.GameStateRepository;
 import com.mafia.repository.PlayerRepository;
@@ -14,19 +15,24 @@ import org.springframework.stereotype.Service;
 @Service
 public class NightPhaseService {
 
+    private static final int PHASE_TIMER_SECONDS = 30;
+
     private final GameStateRepository gameStateRepository;
     private final PlayerRepository playerRepository;
     private final GameEventRepository gameEventRepository;
     private final WinConditionService winConditionService;
+    private final EventServiceClient eventServiceClient;
 
     public NightPhaseService(GameStateRepository gameStateRepository,
             PlayerRepository playerRepository,
             GameEventRepository gameEventRepository,
-            WinConditionService winConditionService) {
+            WinConditionService winConditionService,
+            EventServiceClient eventServiceClient) {
         this.gameStateRepository = gameStateRepository;
         this.playerRepository = playerRepository;
         this.gameEventRepository = gameEventRepository;
         this.winConditionService = winConditionService;
+        this.eventServiceClient = eventServiceClient;
     }
 
     public void submitNightKill(String roomId, String targetUsername) {
@@ -35,11 +41,17 @@ public class NightPhaseService {
             throw new IllegalStateException("Not in NIGHT phase");
         }
         requireAlivePlayer(targetUsername, roomId);
+        Player target = playerRepository.findByUsernameAndRoomId(targetUsername, roomId)
+                .orElseThrow(() -> new IllegalArgumentException("Player not found: " + targetUsername));
+        if ("MAFIA".equals(target.getRole())) {
+            throw new IllegalStateException("Mafia cannot target another Mafia");
+        }
         gs.setNightKillTarget(targetUsername);
         gs.setUpdatedAt(LocalDateTime.now());
         gameStateRepository.save(gs);
-        gameEventRepository.save(new GameEvent(roomId, "NIGHT_KILL",
-                "Mafia has chosen their target"));
+        String nightKillMsg = "Mafia has chosen their target";
+        gameEventRepository.save(new GameEvent(roomId, "NIGHT_KILL", nightKillMsg));
+        eventServiceClient.pushEvent(roomId, "NIGHT_KILL", nightKillMsg);
     }
 
     public void submitPoliceGuess(String roomId, String suspectUsername) {
@@ -59,11 +71,13 @@ public class NightPhaseService {
         gameStateRepository.save(gs);
 
         if (correct) {
-            gameEventRepository.save(new GameEvent(roomId, "POLICE_GUESS",
-                    "Police correctly identified a Mafia member: " + suspectUsername));
+            String msg = "Police correctly identified a Mafia member: " + suspectUsername;
+            gameEventRepository.save(new GameEvent(roomId, "POLICE_GUESS", msg));
+            eventServiceClient.pushEvent(roomId, "POLICE_GUESS", msg);
         } else {
-            gameEventRepository.save(new GameEvent(roomId, "POLICE_GUESS",
-                    "Police made a guess but it was incorrect."));
+            String msg = "Police made a guess but it was incorrect.";
+            gameEventRepository.save(new GameEvent(roomId, "POLICE_GUESS", msg));
+            eventServiceClient.pushEvent(roomId, "POLICE_GUESS", msg);
         }
     }
 
@@ -83,8 +97,9 @@ public class NightPhaseService {
         gs.setUpdatedAt(LocalDateTime.now());
         gameStateRepository.save(gs);
 
-        gameEventRepository.save(new GameEvent(roomId, "DOCTOR_SAVE",
-                "A doctor has chosen a save target."));
+        String doctorMsg = "A doctor has chosen a save target.";
+        gameEventRepository.save(new GameEvent(roomId, "DOCTOR_SAVE", doctorMsg));
+        eventServiceClient.pushEvent(roomId, "DOCTOR_SAVE", doctorMsg);
     }
 
     public void advancePhase(String roomId) {
@@ -105,17 +120,19 @@ public class NightPhaseService {
     }
 
     private void transitionToPoliceGuess(String roomId, GameState gs) {
-        setPhase(gs, "POLICE_GUESS");
+        setPhase(roomId, gs, "POLICE_GUESS");
         gameStateRepository.save(gs);
-        gameEventRepository.save(new GameEvent(roomId, "PHASE_TRANSITIONED",
-                "Night is over. Police is investigating."));
+        String msg = "Night is over. Police is investigating.";
+        gameEventRepository.save(new GameEvent(roomId, "PHASE_TRANSITIONED", msg));
+        eventServiceClient.pushEvent(roomId, "PHASE_TRANSITIONED", msg);
     }
 
     private void transitionToDoctorSave(String roomId, GameState gs) {
-        setPhase(gs, "DOCTOR_SAVE");
+        setPhase(roomId, gs, "DOCTOR_SAVE");
         gameStateRepository.save(gs);
-        gameEventRepository.save(new GameEvent(roomId, "PHASE_TRANSITIONED",
-                "Doctors may now choose players to save."));
+        String msg = "Doctors may now choose players to save.";
+        gameEventRepository.save(new GameEvent(roomId, "PHASE_TRANSITIONED", msg));
+        eventServiceClient.pushEvent(roomId, "PHASE_TRANSITIONED", msg);
     }
 
     private void transitionToSunrise(String roomId, GameState gs) {
@@ -148,45 +165,52 @@ public class NightPhaseService {
         String winner = winConditionService.checkWinCondition(roomId);
         if (!"NONE".equals(winner)) {
             gs.setWinner(winner);
-            setPhase(gs, "GAME_OVER");
+            setPhase(roomId, gs, "GAME_OVER");
             gameStateRepository.save(gs);
-            gameEventRepository.save(new GameEvent(roomId, "GAME_OVER", winner + " wins!"));
+            String gameOverMsg = winner + " wins!";
+            gameEventRepository.save(new GameEvent(roomId, "GAME_OVER", gameOverMsg));
+            eventServiceClient.pushEvent(roomId, "GAME_OVER", gameOverMsg);
             return;
         }
 
-        setPhase(gs, "SUNRISE");
+        setPhase(roomId, gs, "SUNRISE");
         gameStateRepository.save(gs);
-        gameEventRepository.save(new GameEvent(roomId, "PHASE_TRANSITIONED",
-                buildSunriseMessage(gs)));
+        String sunriseMsg = buildSunriseMessage(gs);
+        gameEventRepository.save(new GameEvent(roomId, "PHASE_TRANSITIONED", sunriseMsg));
+        eventServiceClient.pushEvent(roomId, "PHASE_TRANSITIONED", sunriseMsg);
     }
 
     private void transitionToDayDiscussion(String roomId, GameState gs) {
         gs.setDayNumber(gs.getDayNumber() + 1);
-        setPhase(gs, "DAY_DISCUSSION");
+        setPhase(roomId, gs, "DAY_DISCUSSION");
         gs.setNightKillTarget(null);
         gs.setPoliceGuessTarget(null);
         gs.setPoliceGuessCorrect(null);
         gs.setDoctorSaveTargets(new ArrayList<>());
         gs.setNightKillFailed(null);
         gameStateRepository.save(gs);
-        gameEventRepository.save(new GameEvent(roomId, "PHASE_TRANSITIONED",
-                "Day " + gs.getDayNumber() + " discussion begins."));
+        String dayMsg = "Day " + gs.getDayNumber() + " discussion begins.";
+        gameEventRepository.save(new GameEvent(roomId, "PHASE_TRANSITIONED", dayMsg));
+        eventServiceClient.pushEvent(roomId, "PHASE_TRANSITIONED", dayMsg);
     }
 
     private void transitionToVoting(String roomId, GameState gs) {
-        setPhase(gs, "VOTING");
+        setPhase(roomId, gs, "VOTING");
         gameStateRepository.save(gs);
-        gameEventRepository.save(new GameEvent(roomId, "PHASE_TRANSITIONED",
-                "Voting begins. Choose who to eliminate."));
+        String voteMsg = "Voting begins. Choose who to eliminate.";
+        gameEventRepository.save(new GameEvent(roomId, "PHASE_TRANSITIONED", voteMsg));
+        eventServiceClient.pushEvent(roomId, "PHASE_TRANSITIONED", voteMsg);
     }
 
     private void transitionAfterVoting(String roomId, GameState gs) {
         String winner = winConditionService.checkWinCondition(roomId);
         if (!"NONE".equals(winner)) {
             gs.setWinner(winner);
-            setPhase(gs, "GAME_OVER");
+            setPhase(roomId, gs, "GAME_OVER");
             gameStateRepository.save(gs);
-            gameEventRepository.save(new GameEvent(roomId, "GAME_OVER", winner + " wins!"));
+            String msg = winner + " wins!";
+            gameEventRepository.save(new GameEvent(roomId, "GAME_OVER", msg));
+            eventServiceClient.pushEvent(roomId, "GAME_OVER", msg);
         } else {
             gs.setNightNumber(gs.getNightNumber() + 1);
             gs.setNightKillTarget(null);
@@ -194,10 +218,11 @@ public class NightPhaseService {
             gs.setPoliceGuessCorrect(null);
             gs.setDoctorSaveTargets(new ArrayList<>());
             gs.setNightKillFailed(null);
-            setPhase(gs, "NIGHT");
+            setPhase(roomId, gs, "NIGHT");
             gameStateRepository.save(gs);
-            gameEventRepository.save(new GameEvent(roomId, "PHASE_TRANSITIONED",
-                    "Night " + gs.getNightNumber() + " begins."));
+            String nightMsg = "Night " + gs.getNightNumber() + " begins.";
+            gameEventRepository.save(new GameEvent(roomId, "PHASE_TRANSITIONED", nightMsg));
+            eventServiceClient.pushEvent(roomId, "PHASE_TRANSITIONED", nightMsg);
         }
     }
 
@@ -205,14 +230,17 @@ public class NightPhaseService {
         String winner = winConditionService.checkWinCondition(roomId);
         if (!"NONE".equals(winner)) {
             gs.setWinner(winner);
-            setPhase(gs, "GAME_OVER");
+            setPhase(roomId, gs, "GAME_OVER");
             gameStateRepository.save(gs);
-            gameEventRepository.save(new GameEvent(roomId, "GAME_OVER", winner + " wins!"));
+            String msg = winner + " wins!";
+            gameEventRepository.save(new GameEvent(roomId, "GAME_OVER", msg));
+            eventServiceClient.pushEvent(roomId, "GAME_OVER", msg);
         } else {
-            setPhase(gs, "WIN_CHECK");
+            String msg = "Win check complete. Game continues.";
+            setPhase(roomId, gs, "WIN_CHECK");
             gameStateRepository.save(gs);
-            gameEventRepository.save(new GameEvent(roomId, "PHASE_TRANSITIONED",
-                    "Win check complete. Game continues."));
+            gameEventRepository.save(new GameEvent(roomId, "PHASE_TRANSITIONED", msg));
+            eventServiceClient.pushEvent(roomId, "PHASE_TRANSITIONED", msg);
         }
     }
 
@@ -220,17 +248,20 @@ public class NightPhaseService {
         String winner = winConditionService.checkWinCondition(roomId);
         if (!"NONE".equals(winner)) {
             gs.setWinner(winner);
-            setPhase(gs, "GAME_OVER");
+            setPhase(roomId, gs, "GAME_OVER");
             gameStateRepository.save(gs);
-            gameEventRepository.save(new GameEvent(roomId, "GAME_OVER", winner + " wins!"));
+            String msg = winner + " wins!";
+            gameEventRepository.save(new GameEvent(roomId, "GAME_OVER", msg));
+            eventServiceClient.pushEvent(roomId, "GAME_OVER", msg);
         } else {
             gs.setNightNumber(gs.getNightNumber() + 1);
             gs.setDoctorSaveTargets(new ArrayList<>());
             gs.setNightKillFailed(null);
-            setPhase(gs, "NIGHT");
+            setPhase(roomId, gs, "NIGHT");
             gameStateRepository.save(gs);
-            gameEventRepository.save(new GameEvent(roomId, "PHASE_TRANSITIONED",
-                    "Night " + gs.getNightNumber() + " begins."));
+            String nightMsg = "Night " + gs.getNightNumber() + " begins.";
+            gameEventRepository.save(new GameEvent(roomId, "PHASE_TRANSITIONED", nightMsg));
+            eventServiceClient.pushEvent(roomId, "PHASE_TRANSITIONED", nightMsg);
         }
     }
 
@@ -248,10 +279,15 @@ public class NightPhaseService {
         gs.setEliminatedPlayers(elim);
     }
 
-    private void setPhase(GameState gs, String phase) {
+    private void setPhase(String roomId, GameState gs, String phase) {
         gs.setPhase(phase);
         gs.setPhaseStartTime(LocalDateTime.now());
         gs.setUpdatedAt(LocalDateTime.now());
+        if ("GAME_OVER".equals(phase)) {
+            eventServiceClient.cancelPhaseTimer(roomId);
+            return;
+        }
+        eventServiceClient.startPhaseTimer(roomId, phase, PHASE_TIMER_SECONDS);
     }
 
     private void requireAlivePlayer(String username, String roomId) {
@@ -276,7 +312,7 @@ public class NightPhaseService {
             } else if (Boolean.FALSE.equals(gs.getNightKillFailed())) {
                 sb.append(gs.getNightKillTarget()).append(" was killed during the night. ");
             } else {
-                sb.append(gs.getNightKillTarget()).append(" was targeted during the night. ");
+                sb.append( "A Player was targeted during the night. ");
             }
         } else {
             sb.append("Nobody was killed last night. ");
@@ -286,8 +322,7 @@ public class NightPhaseService {
                 sb.append("Police correctly identified ").append(gs.getPoliceGuessTarget())
                         .append(" as Mafia!");
             } else {
-                sb.append("Police guessed ").append(gs.getPoliceGuessTarget())
-                        .append(" — but they were wrong.");
+                sb.append("Police guessed, but they were wrong.");
             }
         }
         return sb.toString();

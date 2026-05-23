@@ -41,7 +41,7 @@ class RoomControllerTest {
         static Stream<Arguments> createRoomScenarios() {
                 return Stream.of(
                                 Arguments.of(
-                                                Named.of("success", (ServiceSetup) s -> {
+                                                Named.of("TestShouldReturnSucessWithValidInput", (ServiceSetup) s -> {
                                                         Room r = new Room("Test Room", "host1", "CODE01", 12);
                                                         r.setId("room-1");
                                                         when(s.createRoom("Test Room", "host1")).thenReturn(r);
@@ -50,7 +50,7 @@ class RoomControllerTest {
                                                 jsonPath("$.roomId").value("room-1"),
                                                 jsonPath("$.roomCode").value("CODE01")),
                                 Arguments.of(
-                                                Named.of("illegal argument returns 400",
+                                                Named.of("TestShouldReturn400WhenInvalidRoomNameProvided",
                                                                 (ServiceSetup) s -> doThrow(
                                                                                 new IllegalArgumentException(
                                                                                                 "Invalid room name"))
@@ -60,7 +60,8 @@ class RoomControllerTest {
                                                 jsonPath("$.status").value("error"),
                                                 jsonPath("$.message").value("Invalid room name")),
                                 Arguments.of(
-                                                Named.of("unexpected error returns 500",
+                                                Named.of("TestShouldReturn500OnUnexpectedError",
+
                                                                 (ServiceSetup) s -> doThrow(
                                                                                 new RuntimeException("db down"))
                                                                                 .when(s)
@@ -89,7 +90,7 @@ class RoomControllerTest {
         static Stream<Arguments> joinByCodeScenarios() {
                 return Stream.of(
                                 Arguments.of(
-                                                Named.of("success", (ServiceSetup) s -> {
+                                                Named.of("TestShouldReturnSuccessWithValidInput", (ServiceSetup) s -> {
                                                         Room r = new Room("Test Room", "host1", "CODE01", 12);
                                                         r.setId("room-1");
                                                         when(s.joinRoomByCode("CODE01", "p2")).thenReturn(r);
@@ -98,7 +99,7 @@ class RoomControllerTest {
                                                 jsonPath("$.roomId").value("room-1"),
                                                 jsonPath("$.roomCode").value("CODE01")),
                                 Arguments.of(
-                                                Named.of("room not found returns 400",
+                                                Named.of("TestShouldReturn400WhenRoomNotFound",
                                                                 (ServiceSetup) s -> doThrow(
                                                                                 new IllegalArgumentException(
                                                                                                 "Room not found"))
@@ -108,7 +109,8 @@ class RoomControllerTest {
                                                 jsonPath("$.status").value("error"),
                                                 jsonPath("$.message").value("Room not found")),
                                 Arguments.of(
-                                                Named.of("unexpected error returns 500",
+                                                Named.of("TestShouldReturn500OnUnexpectedError",
+
                                                                 (ServiceSetup) s -> doThrow(
                                                                                 new RuntimeException("db down"))
                                                                                 .when(s)
@@ -137,7 +139,7 @@ class RoomControllerTest {
         static Stream<Arguments> getByCodeScenarios() {
                 return Stream.of(
                                 Arguments.of(
-                                                Named.of("success", (ServiceSetup) s -> {
+                                                Named.of("TestShouldReturnSuccessWithValidInput", (ServiceSetup) s -> {
                                                         Room r = new Room("Test Room", "host1", "CODE01", 12);
                                                         r.setId("room-1");
                                                         when(s.getRoomByCode("CODE01")).thenReturn(r);
@@ -146,7 +148,7 @@ class RoomControllerTest {
                                                 jsonPath("$.roomId").value("room-1"),
                                                 jsonPath("$.roomCode").value("CODE01")),
                                 Arguments.of(
-                                                Named.of("room not found returns 404",
+                                                Named.of("TestShouldReturn404WhenRoomNotFound",
                                                                 (ServiceSetup) s -> doThrow(
                                                                                 new IllegalArgumentException(
                                                                                                 "Room not found"))
@@ -155,7 +157,7 @@ class RoomControllerTest {
                                                 jsonPath("$.status").value("error"),
                                                 jsonPath("$.message").value("Room not found")),
                                 Arguments.of(
-                                                Named.of("unexpected error returns 500",
+                                                Named.of("TestShouldReturn500OnUnexpectedError",
                                                                 (ServiceSetup) s -> doThrow(
                                                                                 new RuntimeException("db down"))
                                                                                 .when(s).getRoomByCode("CODE01")),
@@ -181,7 +183,7 @@ class RoomControllerTest {
         static Stream<Arguments> getPlayersScenarios() {
                 return Stream.of(
                                 Arguments.of(
-                                                Named.of("success", (ServiceSetup) s -> {
+                                                Named.of("TestShouldReturnSuccessWithValidInput", (ServiceSetup) s -> {
                                                         Player p = new Player("p1", "room-1");
                                                         when(s.getRoomPlayers("room-1")).thenReturn(List.of(p));
                                                 }),
@@ -189,7 +191,7 @@ class RoomControllerTest {
                                                 jsonPath("$[0].name").value("p1"),
                                                 jsonPath("$[0].alive").value(true)),
                                 Arguments.of(
-                                                Named.of("room not found returns 404",
+                                                Named.of("TestShouldReturn404WhenRoomNotFound",
                                                                 (ServiceSetup) s -> doThrow(
                                                                                 new IllegalArgumentException(
                                                                                                 "Room not found"))
@@ -198,7 +200,7 @@ class RoomControllerTest {
                                                 jsonPath("$.status").value("error"),
                                                 jsonPath("$.message").value("Room not found")),
                                 Arguments.of(
-                                                Named.of("unexpected error returns 500",
+                                                Named.of("TestShouldReturn500OnUnexpectedError",
                                                                 (ServiceSetup) s -> doThrow(
                                                                                 new RuntimeException("db down"))
                                                                                 .when(s).getRoomPlayers("room-1")),
@@ -221,50 +223,55 @@ class RoomControllerTest {
                 verify(roomService).getRoomPlayers("room-1");
         }
 
-    static Stream<Arguments> getPlayersByCodeScenarios() {
-        return Stream.of(
-                Arguments.of(
-                        Named.of("success - null role defaults to empty string", (ServiceSetup) s -> {
-                            Room r = new Room("Test Room", "host1", "CODE01", 12);
-                            r.setId("room-1");
-                            Player p = new Player("p2", "room-1");
-                            p.setStatus("ELIMINATED");
-                            p.setRole(null);
-                            when(s.getRoomByCode("CODE01")).thenReturn(r);
-                            when(s.getRoomPlayers("room-1")).thenReturn(List.of(p));
-                        }),
-                        200,
-                        jsonPath("$[0].name").value("p2"),
-                        jsonPath("$[0].alive").value(false)),
-                Arguments.of(
-                        Named.of("room not found returns 404",
-                                (ServiceSetup) s -> doThrow(new IllegalArgumentException("Room not found"))
-                                        .when(s).getRoomByCode("CODE01")),
-                        404,
-                        jsonPath("$.status").value("error"),
-                        jsonPath("$.message").value("Room not found")),
-                Arguments.of(
-                        Named.of("unexpected error returns 500",
-                                (ServiceSetup) s -> doThrow(new RuntimeException("db down"))
-                                        .when(s).getRoomByCode("CODE01")),
-                        500,
-                        jsonPath("$.status").value("error"),
-                        jsonPath("$.message").value("Internal server error")),
-                Arguments.of(
-                        Named.of("success - role populated", 
-                                (ServiceSetup) s -> {
-                                Room r = new Room("Test Room", "host1", "CODE01", 12);
-                                r.setId("room-1");
-                                Player p = new Player("p2", "room-1");
-                                p.setStatus("ALIVE");
-                                p.setRole("MAFIA");
-                                when(s.getRoomByCode("CODE01")).thenReturn(r);
-                                when(s.getRoomPlayers("room-1")).thenReturn(List.of(p));
-                        }),
-                        200,
-                        jsonPath("$[0].name").value("p2"),
-                        jsonPath("$[0].role").value("MAFIA")));
-    }
+        static Stream<Arguments> getPlayersByCodeScenarios() {
+                return Stream.of(
+                                Arguments.of(
+                                                Named.of("TestShouldReturnSuccessWithValidInput", (ServiceSetup) s -> {
+                                                        Room r = new Room("Test Room", "host1", "CODE01", 12);
+                                                        r.setId("room-1");
+                                                        Player p = new Player("p2", "room-1");
+                                                        p.setStatus("ELIMINATED");
+                                                        p.setRole(null);
+                                                        when(s.getRoomByCode("CODE01")).thenReturn(r);
+                                                        when(s.getRoomPlayers("room-1")).thenReturn(List.of(p));
+                                                }),
+                                                200,
+                                                jsonPath("$[0].name").value("p2"),
+                                                jsonPath("$[0].alive").value(false)),
+                                Arguments.of(
+                                                Named.of("TestShouldReturn404WhenRoomNotFound",
+                                                                (ServiceSetup) s -> doThrow(
+                                                                                new IllegalArgumentException(
+                                                                                                "Room not found"))
+                                                                                .when(s).getRoomByCode("CODE01")),
+                                                404,
+                                                jsonPath("$.status").value("error"),
+                                                jsonPath("$.message").value("Room not found")),
+                                Arguments.of(
+                                                Named.of("TestShouldReturn500OnUnexpectedError",
+                                                                (ServiceSetup) s -> doThrow(
+                                                                                new RuntimeException("db down"))
+                                                                                .when(s).getRoomByCode("CODE01")),
+                                                500,
+                                                jsonPath("$.status").value("error"),
+                                                jsonPath("$.message").value("Internal server error")),
+                                Arguments.of(
+                                                Named.of("TestShouldReturnSuccessWithValidInput",
+                                                                (ServiceSetup) s -> {
+                                                                        Room r = new Room("Test Room", "host1",
+                                                                                        "CODE01", 12);
+                                                                        r.setId("room-1");
+                                                                        Player p = new Player("p2", "room-1");
+                                                                        p.setStatus("ALIVE");
+                                                                        p.setRole("MAFIA");
+                                                                        when(s.getRoomByCode("CODE01")).thenReturn(r);
+                                                                        when(s.getRoomPlayers("room-1"))
+                                                                                        .thenReturn(List.of(p));
+                                                                }),
+                                                200,
+                                                jsonPath("$[0].name").value("p2"),
+                                                jsonPath("$[0].role").value("MAFIA")));
+        }
 
         @ParameterizedTest
         @MethodSource("getPlayersByCodeScenarios")
