@@ -30,7 +30,7 @@ from app.services.spring_client.engine_client import (
     submit_vote as engine_submit_vote,
     send_message as engine_send_message,
 )
-from app.services.gin_client.event_client import get_timer as gin_get_timer
+from app.services.gin_client.event_client import get_timer as gin_get_timer, start_phase_timer as gin_start_phase_timer
 from app.dto.request.models import (
     JoinRequest,
     CreateRoomRequest,
@@ -65,6 +65,16 @@ ALGORITHM = os.getenv("JWT_ALGORITHM", "HS256")
 EXPIRES_MINUTES = int(os.getenv("JWT_EXPIRES_MINUTES", "480"))
 WS_POLL_INTERVAL = 1.5
 MIN_PLAYERS_DEFAULT = 6
+
+# Duration (seconds) for each timed phase. Adjust here to tune the game pacing.
+PHASE_DURATION_SECONDS: dict[str, int] = {
+    "NIGHT":          30,
+    "POLICE_GUESS":   30,
+    "DOCTOR_SAVE":    30,
+    "DAY_DISCUSSION": 60,
+    "VOTING":         30,
+    "SUNRISE":        15,
+}
 
 
 def get_current_user(authorization: str = Header(default="")) -> str:
@@ -140,7 +150,10 @@ def _build_snapshot(snap: dict, username: str) -> dict:
 async def _get_timer_data(room_id: str) -> dict:
     try:
         timer = await gin_get_timer(room_id)
-        return {"phase_ends_at": timer.get("updatedAt", ""), "remaining_seconds": timer.get("remainingSeconds", 0)}
+        return {
+           "phase_ends_at": timer.get("updatedAt", ""),
+            "remaining_seconds": timer.get("remainingTime", 0),
+        }
     except Exception:
         logger.warning("Timer service unavailable for room_id=%s, defaulting to empty", room_id)
         return {"phase_ends_at": "", "remaining_seconds": 0}
@@ -229,6 +242,17 @@ async def start_game_endpoint(payload: AdvancePhaseRequest, username: str = Depe
     except Exception as exc:
         logger.exception("Failed to start game room_id=%s", payload.room_id)
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(exc)) from exc
+
+    # Start the timer for the first phase (NIGHT)
+    try:
+        snap = await engine_get_game_state(payload.room_id)
+        first_phase = snap.get("phase", "NIGHT")
+        duration = PHASE_DURATION_SECONDS.get(first_phase)
+        if duration:
+            await gin_start_phase_timer(payload.room_id, first_phase, duration)
+    except Exception as exc:
+        logger.warning("Failed to start initial phase timer room_id=%s: %s", payload.room_id, exc)
+
     return ApiResponse(message="Game started")
 
 
@@ -245,7 +269,25 @@ async def game_state(room_id: str, username: str = Depends(get_current_user)) ->
 
 @router.post("/advance-phase", response_model=ApiResponse)
 async def advance_phase(payload: AdvancePhaseRequest, username: str = Depends(get_current_user)) -> ApiResponse:
-    return await _proxy_action(engine_advance_phase(payload.room_id), "Failed to advance phase", payload.room_id)
+    try:
+        await engine_advance_phase(payload.room_id)
+    except Exception as exc:
+        logger.exception("Failed to advance phase room_id=%s", payload.room_id)
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(exc)) from exc
+
+    # Start a fresh countdown for the new phase
+    try:
+        snap = await engine_get_game_state(payload.room_id)
+        new_phase = snap.get("phase", "")
+        duration = PHASE_DURATION_SECONDS.get(new_phase)
+        if duration:
+            await gin_start_phase_timer(payload.room_id, new_phase, duration)
+            logger.info("Started timer room_id=%s phase=%s duration=%ds", payload.room_id, new_phase, duration)
+    except Exception as exc:
+        # Timer failure is non-fatal — game can still proceed manually
+        logger.warning("Failed to start phase timer room_id=%s: %s", payload.room_id, exc)
+
+    return ApiResponse(message="OK")
 
 
 @router.post("/resolve-voting", response_model=ApiResponse)
