@@ -14,7 +14,6 @@ import com.mafia.repository.RoomRepository;
 import java.time.Instant;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
@@ -24,6 +23,7 @@ import org.springframework.stereotype.Service;
 public class GameStateService {
 
     private static final int MIN_PLAYERS = 6;
+
     private final GameStateRepository gameStateRepository;
     private final PlayerRepository playerRepository;
     private final GameEventRepository gameEventRepository;
@@ -31,6 +31,7 @@ public class GameStateService {
     private final RoomRepository roomRepository;
     private final WinConditionService winConditionService;
     private final EventServiceClient eventServiceClient;
+    private final RoleAssignmentService roleAssignmentService;
 
     public GameStateService(GameStateRepository gameStateRepository,
             PlayerRepository playerRepository,
@@ -38,7 +39,8 @@ public class GameStateService {
             MessageRepository messageRepository,
             RoomRepository roomRepository,
             WinConditionService winConditionService,
-            EventServiceClient eventServiceClient) {
+            EventServiceClient eventServiceClient,
+            RoleAssignmentService roleAssignmentService) {
         this.gameStateRepository = gameStateRepository;
         this.playerRepository = playerRepository;
         this.gameEventRepository = gameEventRepository;
@@ -46,12 +48,12 @@ public class GameStateService {
         this.roomRepository = roomRepository;
         this.winConditionService = winConditionService;
         this.eventServiceClient = eventServiceClient;
+        this.roleAssignmentService = roleAssignmentService;
     }
 
     public void initializeGameState(String roomId) {
         gameStateRepository.save(new GameState(roomId));
-        gameEventRepository.save(new GameEvent(roomId, "GAME_INITIALIZED", "Room created"));
-        eventServiceClient.pushEvent(roomId, "GAME_INITIALIZED", "Room created");
+        pushEvent(roomId, "GAME_INITIALIZED", "Room created");
     }
 
     public AggregatedGameSnapshot getSnapshot(String roomId) {
@@ -92,40 +94,26 @@ public class GameStateService {
         boolean revealNight = isAtOrAfter(gs.getPhase(), "SUNRISE");
         String nightKill = revealNight ? gs.getNightKillTarget() : null;
         String policeGuess = (revealNight && Boolean.TRUE.equals(gs.getPoliceGuessCorrect()))
-                ? gs.getPoliceGuessTarget()
-                : null;
+                ? gs.getPoliceGuessTarget() : null;
         Boolean policeCorrect = revealNight ? gs.getPoliceGuessCorrect() : null;
         Boolean nightKillFailed = revealNight ? gs.getNightKillFailed() : null;
-        
+
         int remainingSeconds = eventServiceClient.getTimerRemainingSeconds(roomId);
         String phaseEndsAt = remainingSeconds > 0
-                ? Instant.now().plusSeconds(remainingSeconds).toString()
-                : null;
+                ? Instant.now().plusSeconds(remainingSeconds).toString() : null;
 
         return new AggregatedGameSnapshot(
-                gs.getPhase(),
-                gs.getDayNumber(),
-                gs.getNightNumber(),
-                playerMaps,
-                gs.getAlivePlayers(),
-                gs.getEliminatedPlayers(),
-                nightKill,
-                nightKillFailed,
-                policeGuess,
-                policeCorrect,
-                gs.getWinner(),
-                chatMaps,
-                eventMaps,
-                getAvailableActions(gs),
-                room.getRoomCode(),
-                room.getHostUsername(),
-                phaseEndsAt);
+                gs.getPhase(), gs.getDayNumber(), gs.getNightNumber(),
+                playerMaps, gs.getAlivePlayers(), gs.getEliminatedPlayers(),
+                nightKill, nightKillFailed, policeGuess, policeCorrect,
+                gs.getWinner(), chatMaps, eventMaps, getAvailableActions(gs),
+                room.getRoomCode(), room.getHostUsername(), phaseEndsAt);
     }
 
     public void startGame(String roomId) {
         GameState gs = requireGameState(roomId);
         Room room = roomRepository.findById(roomId)
-            .orElseThrow(() -> new IllegalArgumentException("Room not found: " + roomId));
+                .orElseThrow(() -> new IllegalArgumentException("Room not found: " + roomId));
         List<Player> players = playerRepository.findByRoomId(roomId);
 
         if (players.size() < MIN_PLAYERS) {
@@ -133,7 +121,7 @@ public class GameStateService {
                     "Need at least " + MIN_PLAYERS + " players to start. Current: " + players.size());
         }
 
-        assignRoles(players);
+        roleAssignmentService.assignRoles(players);
 
         gs.setPhase("NIGHT");
         gs.setNightNumber(1);
@@ -153,9 +141,7 @@ public class GameStateService {
         room.setUpdatedAt(LocalDateTime.now());
         roomRepository.save(room);
 
-        String startMsg = "Game started with " + players.size() + " players";
-        gameEventRepository.save(new GameEvent(roomId, "GAME_STARTED", startMsg));
-        eventServiceClient.pushEvent(roomId, "GAME_STARTED", startMsg);
+        pushEvent(roomId, "GAME_STARTED", "Game started with " + players.size() + " players");
     }
 
     public GameState requireGameState(String roomId) {
@@ -171,29 +157,9 @@ public class GameStateService {
         return order.indexOf(phase) >= order.indexOf(target);
     }
 
-    private void assignRoles(List<Player> players) {
-        int n = players.size();
-        int mafiaCount = Math.max(1, n / 3);
-        int policeCount = 1;
-        int doctorCount = (n >= 4) ? Math.max(1, n / 4) : 0;
-
-        List<String> roles = new ArrayList<>();
-        for (int i = 0; i < mafiaCount; i++)
-            roles.add("MAFIA");
-        for (int i = 0; i < policeCount; i++)
-            roles.add("POLICE");
-        for (int i = 0; i < doctorCount; i++)
-            roles.add("DOCTOR");
-        if (roles.size() < n)
-            roles.add("SOLDIER");
-        while (roles.size() < n)
-            roles.add("VILLAGER");
-
-        Collections.shuffle(roles);
-        for (int i = 0; i < players.size(); i++) {
-            players.get(i).setRole(roles.get(i));
-            playerRepository.save(players.get(i));
-        }
+    private void pushEvent(String roomId, String type, String msg) {
+        gameEventRepository.save(new GameEvent(roomId, type, msg));
+        eventServiceClient.pushEvent(roomId, type, msg);
     }
 
     private List<String> getAvailableActions(GameState gs) {

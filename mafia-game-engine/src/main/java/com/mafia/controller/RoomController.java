@@ -23,68 +23,28 @@ public class RoomController {
 
     @PostMapping("/create")
     public ResponseEntity<?> createRoom(@RequestBody CreateRoomRequest req) {
-        try {
-            return ResponseEntity.ok(roomToMap(roomService.createRoom(req.roomName(), req.hostUsername())));
-        } catch (IllegalArgumentException | IllegalStateException e) {
-            return ResponseEntity.badRequest()
-                    .body(Map.of("status", "error", "message", e.getMessage()));
-        } catch (Exception e) {
-            return ResponseEntity.internalServerError()
-                    .body(Map.of("status", "error", "message", "Internal server error"));
-        }
+        return ResponseEntity.ok(roomToMap(roomService.createRoom(req.roomName(), req.hostUsername())));
     }
 
     @PostMapping("/join-by-code")
     public ResponseEntity<?> joinByCode(@RequestBody JoinRoomByCodeRequest req) {
-        try {
-            return ResponseEntity.ok(roomToMap(roomService.joinRoomByCode(req.roomCode(), req.username())));
-        } catch (IllegalArgumentException | IllegalStateException e) {
-            return ResponseEntity.badRequest()
-                    .body(Map.of("status", "error", "message", e.getMessage()));
-        } catch (Exception e) {
-            return ResponseEntity.internalServerError()
-                    .body(Map.of("status", "error", "message", "Internal server error"));
-        }
+        return ResponseEntity.ok(roomToMap(roomService.joinRoomByCode(req.roomCode(), req.username())));
     }
 
     @GetMapping("/by-code/{code}")
     public ResponseEntity<?> getByCode(@PathVariable String code) {
-        try {
-            return ResponseEntity.ok(roomToMap(roomService.getRoomByCode(code)));
-        } catch (IllegalArgumentException e) {
-            return ResponseEntity.status(404)
-                    .body(Map.of("status", "error", "message", e.getMessage()));
-        } catch (Exception e) {
-            return ResponseEntity.internalServerError()
-                    .body(Map.of("status", "error", "message", "Internal server error"));
-        }
+        return ResponseEntity.ok(roomToMap(roomService.getRoomByCode(code)));
     }
 
     @GetMapping("/{roomId}/players")
     public ResponseEntity<?> getPlayers(@PathVariable String roomId) {
-        try {
-            return ResponseEntity.ok(playersToList(roomService.getRoomPlayers(roomId)));
-        } catch (IllegalArgumentException e) {
-            return ResponseEntity.status(404)
-                    .body(Map.of("status", "error", "message", e.getMessage()));
-        } catch (Exception e) {
-            return ResponseEntity.internalServerError()
-                    .body(Map.of("status", "error", "message", "Internal server error"));
-        }
+        return ResponseEntity.ok(playersToList(roomService.getRoomPlayers(roomId)));
     }
 
     @GetMapping("/by-code/{code}/players")
     public ResponseEntity<?> getPlayersByCode(@PathVariable String code) {
-        try {
-            Room room = roomService.getRoomByCode(code);
-            return ResponseEntity.ok(playersToList(roomService.getRoomPlayers(room.getId())));
-        } catch (IllegalArgumentException e) {
-            return ResponseEntity.status(404)
-                    .body(Map.of("status", "error", "message", e.getMessage()));
-        } catch (Exception e) {
-            return ResponseEntity.internalServerError()
-                    .body(Map.of("status", "error", "message", "Internal server error"));
-        }
+        Room room = roomService.getRoomByCode(code);
+        return ResponseEntity.ok(playersToList(roomService.getRoomPlayers(room.getId())));
     }
 
     private Map<String, Object> roomToMap(Room room) {
