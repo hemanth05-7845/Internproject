@@ -46,7 +46,6 @@ export default function GameRoomPage({ roomId, roomCode, snapshot, hostUsername 
   const others = alivePlayers.filter(n => n !== username);
   const mafiaTargets = others.filter(n => !mafiaMembers.includes(n));
 
-  // Reset action flag on every phase change
   useEffect(() => { setActionDone(false); }, [phase]);
 
   const act = async (fn) => {
@@ -72,7 +71,6 @@ export default function GameRoomPage({ roomId, roomCode, snapshot, hostUsername 
     window.location.reload();
   };
 
-  // Chat
   const [chatInput, setChatInput] = useState("");
   const [chatSending, setChatSending] = useState(false);
   const chatEndRef = useRef(null);
@@ -94,12 +92,11 @@ export default function GameRoomPage({ roomId, roomCode, snapshot, hostUsername 
 
   return (
     <div className="game-room">
-      {/* Top bar */}
       <header className="game-header glass">
         <div className="header-left">
           <span className="room-code-sm">{roomCode}</span>
           <span className={`phase-badge phase-${phase}`}>{phase.replace("_", " ")}</span>
-          <Timer seconds={remainingSeconds ?? 30} />
+          <Timer seconds={remainingSeconds ?? 0} />
           {dayNumber > 0 && <span className="day-tag">Day {dayNumber}</span>}
           {nightNumber > 0 && <span className="night-tag">Night {nightNumber}</span>}
         </div>
@@ -118,7 +115,6 @@ export default function GameRoomPage({ roomId, roomCode, snapshot, hostUsername 
       </header>
 
       <div className="game-body">
-        {/* Left: players */}
         <aside className="players-panel glass">
           <h3 className="panel-title">Players <span className="panel-count">{alivePlayers.length} alive</span></h3>
           <div className="player-list">
@@ -134,7 +130,6 @@ export default function GameRoomPage({ roomId, roomCode, snapshot, hostUsername 
           </div>
         </aside>
 
-        {/* Centre: phase action */}
         <main className="action-panel">
           {phase === "LOADING" && (
             <div className="phase-card glass fade-up">
@@ -372,7 +367,6 @@ export default function GameRoomPage({ roomId, roomCode, snapshot, hostUsername 
           {err && <div className="error-msg" style={{ marginTop: 12 }}>{err}</div>}
         </main>
 
-        {/* Right: chat + events */}
         <aside className="events-panel glass">
           <h3 className="panel-title">Chat</h3>
           <div className="chat-messages">

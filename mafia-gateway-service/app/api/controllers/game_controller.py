@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import asyncio
 import logging
 import os
@@ -13,6 +15,7 @@ from fastapi import (
     WebSocketDisconnect,
     status,
 )
+from temporalio.client import Client
 
 from app.core.security.jwt_handler import create_access_token, decode_access_token
 from app.services.spring_client.engine_client import (
@@ -30,7 +33,7 @@ from app.services.spring_client.engine_client import (
     submit_vote as engine_submit_vote,
     send_message as engine_send_message,
 )
-from app.services.gin_client.event_client import get_timer as gin_get_timer, start_phase_timer as gin_start_phase_timer
+from app.services.gin_client.event_client import get_timer as gin_get_timer
 from app.dto.request.models import (
     JoinRequest,
     CreateRoomRequest,
@@ -49,11 +52,12 @@ from app.dto.response.models import (
     RoomResponse,
     TokenResponse,
 )
-from app.services.game_orchestrator.room_store import (
-    register_session,
-    cache_room,
-    get_host,
-    is_host,
+from app.temporal.client_helpers import (
+    start_lifecycle_workflow,
+    signal_game_started,
+    signal_phase_advanced,
+    signal_game_ended,
+    query_room_state,
 )
 
 logger = logging.getLogger(__name__)
@@ -66,7 +70,6 @@ EXPIRES_MINUTES = int(os.getenv("JWT_EXPIRES_MINUTES", "480"))
 WS_POLL_INTERVAL = 1.5
 MIN_PLAYERS_DEFAULT = 6
 
-# Duration (seconds) for each timed phase. Adjust here to tune the game pacing.
 PHASE_DURATION_SECONDS: dict[str, int] = {
     "NIGHT":          30,
     "POLICE_GUESS":   30,
@@ -76,13 +79,35 @@ PHASE_DURATION_SECONDS: dict[str, int] = {
     "SUNRISE":        15,
 }
 
+# ── Temporal client injected at startup by main.py ────────────────────────────
+_temporal_client: Client | None = None
+
+
+def set_temporal_client(client: Client) -> None:
+    global _temporal_client
+    _temporal_client = client
+
+
+def _get_temporal_client() -> Client:
+    if _temporal_client is None:
+        raise RuntimeError("Temporal client not initialised")
+    return _temporal_client
+
+
+# ── Auth ──────────────────────────────────────────────────────────────────────
 
 def get_current_user(authorization: str = Header(default="")) -> str:
     if not authorization.startswith("Bearer "):
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Missing bearer token")
     token = authorization.removeprefix("Bearer ")
+    # Allow internal service token (used by Temporal activity auto-advance)
+    internal_token = os.getenv("INTERNAL_SERVICE_TOKEN", "")
+    if internal_token and token == internal_token:
+        return "internal-service"
     return decode_access_token(token, SECRET, ALGORITHM)
 
+
+# ── Private helpers ───────────────────────────────────────────────────────────
 
 def _room_response(room: dict) -> RoomResponse:
     return RoomResponse(
@@ -105,7 +130,8 @@ def _mask_players(players: list, username: str, game_over: bool) -> tuple[list, 
         is_me = p.get("name") == username
         if is_me:
             my_player = p
-        masked.append({"name": p.get("name"), "alive": p.get("alive", True), "role": role if (game_over or is_me) else None})
+        masked.append({"name": p.get("name"), "alive": p.get("alive", True),
+                        "role": role if (game_over or is_me) else None})
         if role == "MAFIA":
             mafia_members.append(p.get("name"))
     return masked, my_player, mafia_members
@@ -151,7 +177,7 @@ async def _get_timer_data(room_id: str) -> dict:
     try:
         timer = await gin_get_timer(room_id)
         return {
-           "phase_ends_at": timer.get("updatedAt", ""),
+            "phase_ends_at": timer.get("updatedAt", ""),
             "remaining_seconds": timer.get("remainingTime", 0),
         }
     except Exception:
@@ -168,6 +194,8 @@ async def _proxy_action(coro, log_msg: str, room_id: str) -> ApiResponse:
     return ApiResponse(message="OK")
 
 
+# ── Routes ────────────────────────────────────────────────────────────────────
+
 @router.get("/health")
 def health() -> dict:
     return {"status": "ok", "service": "mafia-gateway"}
@@ -175,31 +203,48 @@ def health() -> dict:
 
 @router.post("/auth/join", response_model=TokenResponse)
 def join(payload: JoinRequest) -> TokenResponse:
-    register_session(payload.username)
-    token = create_access_token(subject=payload.username, secret=SECRET, algorithm=ALGORITHM, expires_minutes=EXPIRES_MINUTES)
+    token = create_access_token(
+        subject=payload.username, secret=SECRET,
+        algorithm=ALGORITHM, expires_minutes=EXPIRES_MINUTES,
+    )
     return TokenResponse(access_token=token)
 
 
 @router.post("/create-room", response_model=RoomResponse)
-async def create_room_endpoint(payload: CreateRoomRequest, username: str = Depends(get_current_user)) -> RoomResponse:
+async def create_room_endpoint(
+    payload: CreateRoomRequest,
+    username: str = Depends(get_current_user),
+) -> RoomResponse:
     try:
         room = await engine_create_room(payload.room_name, username)
     except Exception as exc:
-        logger.exception("Failed to create room for user=%s", username)
-        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(exc)) from exc
-    cache_room(room["roomCode"], room["roomId"], room["hostUsername"])
+        logger.exception("Failed to create room user=%s", username)
+        raise HTTPException(status_code=500, detail=str(exc)) from exc
+
+    # Start the durable lifecycle workflow — replaces cache_room() + room_store.
+    await start_lifecycle_workflow(
+        _get_temporal_client(),
+        room["roomId"], room["roomCode"], room["hostUsername"],
+    )
     return _room_response(room)
 
 
 @router.post("/join-room", response_model=RoomResponse)
-async def join_room_endpoint(payload: JoinRoomRequest, username: str = Depends(get_current_user)) -> RoomResponse:
+async def join_room_endpoint(
+    payload: JoinRoomRequest,
+    username: str = Depends(get_current_user),
+) -> RoomResponse:
     room_code = payload.room_code.upper()
     try:
         room = await engine_join_by_code(room_code, username)
     except Exception as exc:
-        logger.warning("Room not found: code=%s user=%s error=%s", room_code, username, exc)
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Room not found: {exc}") from exc
-    cache_room(room["roomCode"], room["roomId"], room["hostUsername"])
+
+    # Idempotent — safe to call even if create_room already started the workflow.
+    await start_lifecycle_workflow(
+        _get_temporal_client(),
+        room["roomId"], room["roomCode"], room["hostUsername"],
+    )
     return _room_response(room)
 
 
@@ -209,7 +254,6 @@ async def get_room_players(room_code: str, _: str = Depends(get_current_user)) -
     try:
         players, room = await asyncio.gather(engine_get_players(code), engine_get_room(code))
     except Exception as exc:
-        logger.warning("Failed to fetch players for room_code=%s: %s", code, exc)
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
     min_players = room.get("minPlayers", MIN_PLAYERS_DEFAULT)
     return {
@@ -222,15 +266,23 @@ async def get_room_players(room_code: str, _: str = Depends(get_current_user)) -
 
 
 @router.post("/start-game", response_model=ApiResponse)
-async def start_game_endpoint(payload: AdvancePhaseRequest, username: str = Depends(get_current_user)) -> ApiResponse:
-    if get_host(payload.room_id) is None:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Room not found in cache")
-    if not is_host(payload.room_id, username):
+async def start_game_endpoint(
+    payload: AdvancePhaseRequest,
+    username: str = Depends(get_current_user),
+) -> ApiResponse:
+    client = _get_temporal_client()
+    room_id = payload.room_id
+
+    # Query the workflow instead of room_store.get_host() / is_host().
+    room_state = await query_room_state(client, room_id)
+    if not room_state:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Room not found")
+    if room_state.get("host_username") != username:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Only the host can start the game")
+
     try:
-        await engine_start_game(payload.room_id)
+        await engine_start_game(room_id)
     except httpx.HTTPStatusError as exc:
-        logger.exception("Failed to start game room_id=%s", payload.room_id)
         msg = "Failed to start game"
         try:
             data = exc.response.json()
@@ -240,18 +292,19 @@ async def start_game_endpoint(payload: AdvancePhaseRequest, username: str = Depe
                 msg = exc.response.text
         raise HTTPException(status_code=exc.response.status_code, detail=msg) from exc
     except Exception as exc:
-        logger.exception("Failed to start game room_id=%s", payload.room_id)
-        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(exc)) from exc
+        logger.exception("Failed to start game room_id=%s", room_id)
+        raise HTTPException(status_code=500, detail=str(exc)) from exc
 
-    # Start the timer for the first phase (NIGHT)
-    try:
-        snap = await engine_get_game_state(payload.room_id)
-        first_phase = snap.get("phase", "NIGHT")
-        duration = PHASE_DURATION_SECONDS.get(first_phase)
-        if duration:
-            await gin_start_phase_timer(payload.room_id, first_phase, duration)
-    except Exception as exc:
-        logger.warning("Failed to start initial phase timer room_id=%s: %s", payload.room_id, exc)
+    snap = await engine_get_game_state(room_id)
+    first_phase = snap.get("phase", "NIGHT")
+
+    # Signal the workflow — it handles timer start via start_phase_timer_activity.
+    await signal_game_started(
+        client, room_id,
+        first_phase=first_phase,
+        host_username=room_state["host_username"],
+        room_code=room_state["room_code"],
+    )
 
     return ApiResponse(message="Game started")
 
@@ -262,30 +315,57 @@ async def game_state(room_id: str, username: str = Depends(get_current_user)) ->
         snap = await engine_get_game_state(room_id)
     except Exception as exc:
         logger.exception("Backend unavailable for room_id=%s", room_id)
-        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"Backend unavailable: {exc}") from exc
+        raise HTTPException(status_code=500, detail=f"Backend unavailable: {exc}") from exc
     snapshot = {**_build_snapshot(snap, username), **await _get_timer_data(room_id)}
     return GameSnapshot(**snapshot)
 
 
 @router.post("/advance-phase", response_model=ApiResponse)
-async def advance_phase(payload: AdvancePhaseRequest, username: str = Depends(get_current_user)) -> ApiResponse:
-    try:
-        await engine_advance_phase(payload.room_id)
-    except Exception as exc:
-        logger.exception("Failed to advance phase room_id=%s", payload.room_id)
-        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(exc)) from exc
+async def advance_phase(
+    payload: AdvancePhaseRequest,
+    username: str = Depends(get_current_user),
+) -> ApiResponse:
+    client = _get_temporal_client()
+    room_id = payload.room_id
 
-    # Start a fresh countdown for the new phase
     try:
-        snap = await engine_get_game_state(payload.room_id)
-        new_phase = snap.get("phase", "")
-        duration = PHASE_DURATION_SECONDS.get(new_phase)
-        if duration:
-            await gin_start_phase_timer(payload.room_id, new_phase, duration)
-            logger.info("Started timer room_id=%s phase=%s duration=%ds", payload.room_id, new_phase, duration)
+        await engine_advance_phase(room_id)
     except Exception as exc:
-        # Timer failure is non-fatal — game can still proceed manually
-        logger.warning("Failed to start phase timer room_id=%s: %s", payload.room_id, exc)
+        logger.exception("Failed to advance phase room_id=%s", room_id)
+        raise HTTPException(status_code=500, detail=str(exc)) from exc
+
+    snap = await engine_get_game_state(room_id)
+    new_phase = snap.get("phase", "")
+    winner = snap.get("winner", "NONE")
+
+    # Signal the workflow — it starts the timer via start_phase_timer_activity.
+    await signal_phase_advanced(client, room_id, new_phase)
+
+    if winner and winner != "NONE":
+        await signal_game_ended(client, room_id, winner)
+
+    return ApiResponse(message="OK")
+
+@router.post("/internal/advance-phase")
+async def internal_advance_phase(payload: AdvancePhaseRequest) -> ApiResponse:
+    """Called by Temporal activity — no JWT needed, internal Docker network only."""
+    client = _get_temporal_client()
+    room_id = payload.room_id
+
+    try:
+        await engine_advance_phase(room_id)
+    except Exception as exc:
+        logger.exception("Failed to advance phase room_id=%s", room_id)
+        raise HTTPException(status_code=500, detail=str(exc)) from exc
+
+    snap = await engine_get_game_state(room_id)
+    new_phase = snap.get("phase", "")
+    winner = snap.get("winner", "NONE")
+
+    await signal_phase_advanced(client, room_id, new_phase)
+
+    if winner and winner != "NONE":
+        await signal_game_ended(client, room_id, winner)
 
     return ApiResponse(message="OK")
 

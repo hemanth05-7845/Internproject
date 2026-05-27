@@ -16,18 +16,50 @@ services:
       timeout: 5s
       retries: 10
 
-  mafia-game-engine:
-    build: ./mafia-game-engine
-    container_name: mafia-game-engine
+  # ── Temporal server (all-in-one for dev/local) ─────────────────────────────
+  temporal-db:
+    image: postgres:16
+    container_name: mafia-temporal-db
     environment:
-      SPRING_PROFILES_ACTIVE: ${SPRING_PROFILES_ACTIVE}
-      SPRING_DATA_MONGODB_URI: ${SPRING_DATA_MONGODB_URI}
-      GIN_EVENT_BASE_URL: ${GIN_EVENT_BASE_URL}
+      POSTGRES_USER: temporal
+      POSTGRES_PASSWORD: temporal
+      POSTGRES_DB: temporal
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U temporal"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  temporal:
+    image: temporalio/auto-setup:1.24.2
+    container_name: mafia-temporal
+    environment:
+      - DB=postgres12
+      - DB_PORT=5432
+      - POSTGRES_USER=temporal
+      - POSTGRES_PWD=temporal
+      - POSTGRES_SEEDS=temporal-db
     ports:
-      - "8080:8080"
+      - "7233:7233"
     depends_on:
-      mongodb:
+      temporal-db:
         condition: service_healthy
+    healthcheck:
+      test: ["CMD", "tctl", "--address", "temporal:7233", "cluster", "health"]
+      interval: 10s
+      timeout: 5s
+      retries: 15
+      start_period: 30s
+
+  temporal-ui:
+    image: temporalio/ui:2.26.2
+    container_name: mafia-temporal-ui
+    environment:
+      TEMPORAL_ADDRESS: temporal:7233
+    ports:
+      - "8088:8080"
+    depends_on:
+      - temporal
 
   mafia-event-service:
     build: ./mafia-event-service
@@ -36,9 +68,14 @@ services:
       EVENT_SERVICE_PORT: ${EVENT_SERVICE_PORT}
       EVENT_MONGODB_URI: ${SPRING_DATA_MONGODB_URI}
       MONGO_DATABASE: ${MONGO_DATABASE}
-      SPRING_ENGINE_BASE_URL: ${SPRING_ENGINE_BASE_URL}
+      GATEWAY_BASE_URL: http://mafia-gateway-service:8000
+      TEMPORAL_HOST: temporal:7233
+      INTERNAL_SERVICE_TOKEN: ${INTERNAL_SERVICE_TOKEN}
     ports:
       - "8081:8081"
+    depends_on:
+      temporal:
+        condition: service_healthy
 
   mafia-gateway-service:
     build: ./mafia-gateway-service
@@ -51,11 +88,29 @@ services:
       JWT_SECRET: ${JWT_SECRET}
       JWT_ALGORITHM: ${JWT_ALGORITHM}
       JWT_EXPIRES_MINUTES: ${JWT_EXPIRES_MINUTES}
+      TEMPORAL_HOST: temporal:7233
     ports:
       - "8000:8000"
     depends_on:
-      - mafia-game-engine
-      - mafia-event-service
+      mafia-game-engine:
+        condition: service_started
+      mafia-event-service:
+        condition: service_started
+      temporal:
+        condition: service_healthy
+
+  mafia-game-engine:
+    build: ./mafia-game-engine
+    container_name: mafia-game-engine
+    environment:
+      SPRING_PROFILES_ACTIVE: ${SPRING_PROFILES_ACTIVE}
+      SPRING_DATA_MONGODB_URI: ${SPRING_DATA_MONGODB_URI}
+      GIN_EVENT_BASE_URL: ${GIN_EVENT_BASE_URL}
+    ports:
+      - "8080:8080"
+    depends_on:
+      mongodb:
+        condition: service_healthy
 
   mafia-engine-frontend:
     build: ./mafia-engine-frontend

@@ -75,10 +75,14 @@ func (ptc *PhaseTransitionController) GetPhaseStatus(c *gin.Context) {
 	roomID := c.Param("roomId")
 	timer := ptc.timerManager.GetTimer(roomID)
 	if timer == nil {
-		log.Printf("GetPhaseStatus no active timer room=%s", roomID)
-		c.JSON(http.StatusNotFound, gin.H{"error": "no active timer for room"})
-		return
-	}
+    c.JSON(http.StatusOK, models.TimerSnapshot{
+        RoomID:        roomID,
+        Phase:         "",
+        RemainingTime: 0,
+        UpdatedAt:     time.Now().UTC(),
+    })
+    return
+}
 	c.JSON(http.StatusOK, models.TimerSnapshot{
 		RoomID:        roomID,
 		Phase:         timer.CurrentPhase,

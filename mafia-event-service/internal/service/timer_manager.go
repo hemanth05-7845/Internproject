@@ -1,17 +1,23 @@
 package service
 
 import (
+	"context"
 	"fmt"
 	"log"
-	"net/http"
-	"os"
 	"sync"
 	"time"
+
+	"go.temporal.io/sdk/client"
+
+	temporalworker "github.com/example/mafia-event-service/temporal/worker"
+	"github.com/example/mafia-event-service/temporal/workflows"
 )
 
+
 type TimerManager struct {
-	timers map[string]*RoomTimer
-	mu     sync.RWMutex
+	temporalClient client.Client
+	snapshots      map[string]*RoomTimer
+	mu             sync.RWMutex
 }
 
 type RoomTimer struct {
@@ -20,103 +26,97 @@ type RoomTimer struct {
 	PhaseStartTime   time.Time
 	PhaseDurationSec int
 	RemainingTime    int
-	ticker           *time.Ticker
 }
 
-func NewTimerManager() *TimerManager {
+func NewTimerManager(temporalClient client.Client) *TimerManager {
 	return &TimerManager{
-		timers: make(map[string]*RoomTimer),
+		temporalClient: temporalClient,
+		snapshots:      make(map[string]*RoomTimer),
 	}
 }
 
-func engineAdvancePhase(roomID string) {
-    engineURL := os.Getenv("SPRING_ENGINE_BASE_URL")
-    if engineURL == "" {
-        log.Printf("[TimerManager] SPRING_ENGINE_BASE_URL not set; skipping auto-advance for room=%s", roomID)
-        return
-    }
-
-    url := fmt.Sprintf("%s/api/game/%s/advance-phase", engineURL, roomID)
-    
-    resp, err := http.Post(url, "application/json", nil)  // no body needed
-    if err != nil {
-        log.Printf("[TimerManager] auto-advance HTTP error room=%s: %v", roomID, err)
-        return
-    }
-    defer resp.Body.Close()
-    log.Printf("[TimerManager] auto-advance room=%s status=%d", roomID, resp.StatusCode)
+// workflowID returns the deterministic Temporal workflow ID for a room.
+func workflowID(roomID string) string {
+	return fmt.Sprintf("phase-timer-%s", roomID)
 }
-
 
 func (tm *TimerManager) StartTimer(roomID string, phase string, durationSec int) {
-	tm.mu.Lock()
-	defer tm.mu.Unlock()
+	ctx := context.Background()
+	wfID := workflowID(roomID)
 
-	if existing, ok := tm.timers[roomID]; ok {
-		existing.Stop()
+	_ = tm.temporalClient.TerminateWorkflow(ctx, wfID, "", "new phase starting")
+
+	_, err := tm.temporalClient.ExecuteWorkflow(
+		ctx,
+		client.StartWorkflowOptions{
+			ID:        wfID,
+			TaskQueue: temporalworker.TaskQueue,
+		},
+		workflows.PhaseTimerWorkflow,
+		workflows.PhaseTimerInput{
+			RoomID:      roomID,
+			Phase:       phase,
+			DurationSec: durationSec,
+		},
+	)
+	if err != nil {
+		log.Printf("[TimerManager] failed to start workflow room=%s phase=%s: %v", roomID, phase, err)
+		return
 	}
 
-	timer := &RoomTimer{
+	tm.mu.Lock()
+	tm.snapshots[roomID] = &RoomTimer{
 		RoomID:           roomID,
 		CurrentPhase:     phase,
 		PhaseStartTime:   time.Now(),
 		PhaseDurationSec: durationSec,
 		RemainingTime:    durationSec,
 	}
+	tm.mu.Unlock()
 
-	timer.ticker = time.NewTicker(1 * time.Second)
+	go tm.tickSnapshot(roomID, durationSec)
 
-	tm.timers[roomID] = timer
+	log.Printf("[TimerManager] workflow started room=%s phase=%s duration=%ds wfID=%s",
+		roomID, phase, durationSec, wfID)
+}
 
-	go func() {
-		for range timer.ticker.C {
-			tm.mu.Lock()
 
-			timer.RemainingTime--
+func (tm *TimerManager) tickSnapshot(roomID string, durationSec int) {
+	ticker := time.NewTicker(1 * time.Second)
+	defer ticker.Stop()
 
-			if timer.RemainingTime <= 0 {
-				log.Printf(
-					"[TimerManager] timer expired room=%s phase=%s",
-					roomID,
-					timer.CurrentPhase,
-				)
-
-				timer.Stop()
-
-				delete(tm.timers, roomID)
-
-				tm.mu.Unlock()
-
-				// Backend is the ONLY source of truth now
-				go engineAdvancePhase(roomID)
-
-				break
-			}
-
+	for range ticker.C {
+		tm.mu.Lock()
+		snap, ok := tm.snapshots[roomID]
+		if !ok {
 			tm.mu.Unlock()
+			return 
 		}
-	}()
+		snap.RemainingTime--
+		if snap.RemainingTime <= 0 {
+			delete(tm.snapshots, roomID)
+			tm.mu.Unlock()
+			return
+		}
+		tm.mu.Unlock()
+	}
 }
 
 func (tm *TimerManager) GetTimer(roomID string) *RoomTimer {
 	tm.mu.RLock()
 	defer tm.mu.RUnlock()
-
-	return tm.timers[roomID]
+	return tm.snapshots[roomID]
 }
 
 func (tm *TimerManager) StopTimer(roomID string) {
+	ctx := context.Background()
+	if err := tm.temporalClient.CancelWorkflow(ctx, workflowID(roomID), ""); err != nil {
+		log.Printf("[TimerManager] cancel workflow room=%s: %v (may already be done)", roomID, err)
+	}
+
 	tm.mu.Lock()
-	defer tm.mu.Unlock()
+	delete(tm.snapshots, roomID)
+	tm.mu.Unlock()
 
-	if timer, ok := tm.timers[roomID]; ok {
-		timer.Stop()
-		delete(tm.timers, roomID)
-	}
-}
-
-func (rt *RoomTimer) Stop() {
-	if rt.ticker != nil {
-		rt.ticker.Stop()
-	}
+	log.Printf("[TimerManager] timer stopped room=%s", roomID)
 }
